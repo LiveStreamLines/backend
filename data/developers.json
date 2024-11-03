@@ -1,0 +1,30 @@
+[
+  {
+    "_id": "6720deeacb4166963678b8dd",
+    "developerName": "Dev",
+    "developerTag": "dev",
+    "description": "123",
+    "isActive": true,
+    "createdDate": "2024-10-29T13:11:06.212Z",
+    "__v": 0,
+    "logo": "logos/developer/6720deeacb4166963678b8dd.png"
+  },
+  {
+    "_id": "d7485aca1c77704cc740e1d0",
+    "developerName": "new Developer",
+    "developerTag": "ndev",
+    "description": "here will go the developer desc",
+    "createdDate": "2024-10-31T16:44:24.271Z",
+    "logo": "logos/developer/d7485aca1c77704cc740e1d0.jpg",
+    "isActive": true
+  },
+  {
+    "_id": "f0aa845948fb129c86c08dc7",
+    "developerName": "Edited Developer",
+    "developerTag": "dev",
+    "description": "this is added using the generic model",
+    "createdDate": "2024-10-31T18:36:29.160Z",
+    "logo": "logos/developer/f0aa845948fb129c86c08dc7.jpg",
+    "isActive": true
+  }
+]

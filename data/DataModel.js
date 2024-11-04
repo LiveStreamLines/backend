@@ -43,8 +43,7 @@ class DataModel {
         const newItem = {
             _id: id,
             ...item,
-            createdDate: new Date().toISOString(),
-            logo: `img/upload/${id}.jpg`
+            createdDate: new Date().toISOString()
         };
         items.push(newItem);
         this.writeData(items);

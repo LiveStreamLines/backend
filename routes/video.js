@@ -1,7 +1,9 @@
+// routes/video.js
 const express = require('express');
 const router = express.Router();
-const videoController = require ('../controllers/videoController');
+const videoController = require('../controllers/videoController');
 
-router.post('/', videoController.generateVideo());
+// Define route to generate a video from selected pictures
+router.post('/', videoController.generateVideo);
 
 module.exports = router;

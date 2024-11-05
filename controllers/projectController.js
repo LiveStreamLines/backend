@@ -51,11 +51,11 @@ function addProject(req, res) {
                 console.error('Error saving file:', err);
                 return res.status(500).json({ message: 'Failed to save file' });
             }
-            const final = projectData.updateItem(addedProject._id, { image: `logos/project/${imageFileName}` });
+            const final = projectData.updateItem(addedProject._id, { logo: `logos/project/${imageFileName}` });
             return res.status(201).json(final);
         });
     } else {
-        const final = projectData.updateItem(addedProject._id, { image: `` });
+        const final = projectData.updateItem(addedProject._id, { logo: `` });
         return res.status(201).json(final);
     }
 }

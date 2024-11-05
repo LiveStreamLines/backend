@@ -26,8 +26,8 @@ const upload = multer({ storage });
 router.get('/', projectController.getAllProjects);
 router.get('/:id', projectController.getProjectById);
 router.get('/dev/:id', projectController.getProjectByDeveloper);
-router.post('/', upload.single('image'),projectController.addProject);
-router.put('/:id', upload.single('image'), projectController.updateProject);
+router.post('/', upload.single('logo'),projectController.addProject);
+router.put('/:id', upload.single('logo'), projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
 
 module.exports = router;

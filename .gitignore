@@ -44,3 +44,5 @@ Thumbs.db
 
 #data
 /data/cameras.json
+/data/projects.json
+/data/developers.json

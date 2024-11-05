@@ -78,7 +78,7 @@ function updateProject(req, res) {
     if (updatedProject) {
         if (req.file) {
             const imageFileName = `${projectId}${path.extname(req.file.originalname)}`;
-            projectData.updateItem(projectId, { logo: `images/project/${imageFileName}` });
+            projectData.updateItem(projectId, { logo: `logos/project/${imageFileName}` });
         }
         res.json(updatedProject);
     } else {

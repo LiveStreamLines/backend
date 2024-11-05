@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Define the root directory for camera pictures
-const mediaRoot = 'C:/media/upload';
+const mediaRoot = process.env.MEDIA_PATH + '/upload';
 
 // Controller function to get camera pictures
 function getCameraPictures (req, res) {

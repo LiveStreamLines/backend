@@ -3,7 +3,7 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const os = require('os');
 
-const mediaRoot = 'c:/media/upload';
+const mediaRoot = process.env.MEDIA_PATH + '/upload';
 
 function generateVideo(req, res) {
   const { developerId, projectId, cameraId, date1, date2, hour1, hour2, frameRate, duration } = req.body;

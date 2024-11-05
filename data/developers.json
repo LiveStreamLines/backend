@@ -51,5 +51,14 @@
     "createdDate": "2024-11-04T23:47:13.929Z",
     "logo": "logos/developer/47e1c080f5c7a5b486c23f9c.jpg",
     "isActive": "1"
+  },
+  {
+    "_id": "cc1c13d25e501f53960c6343",
+    "developerName": "adding developer",
+    "developerTag": "added",
+    "description": "change to moc also",
+    "createdDate": "2024-11-05T13:44:03.811Z",
+    "logo": "logos/developer/cc1c13d25e501f53960c6343.jpg",
+    "isActive": "1"
   }
 ]

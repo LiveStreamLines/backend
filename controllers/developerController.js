@@ -27,7 +27,7 @@ function addDeveloper(req, res) {
     // Check if a file is uploaded
     if (req.file) {
         const logoFileName = `${addedDeveloper._id}${path.extname(req.file.originalname)}`;
-        const logoFilePath = path.join('c:/media/logos/developer/', logoFileName);
+        const logoFilePath = path.join(process.env.MEDIA_PATH,'logos/developer/', logoFileName);
         
         // Move the uploaded file to the specified directory
         fs.rename(req.file.path, logoFilePath, (err) => {

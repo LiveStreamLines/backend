@@ -2,6 +2,8 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+require('dotenv').config();
+
 const path = require('path');
 const fs = require('fs');
 
@@ -20,10 +22,10 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Middleware to serve static files for media
-app.use('/media/upload', express.static('C:/media/upload'));
+app.use('/media/upload', express.static(process.env.MEDIA_PATH +'/upload'));
 
 
-const logoRoot = 'C:/media/logos';
+const logoRoot = process.env.MEDIA_PATH +'/logos';
 
 // Route to serve developer and project logos
 app.get('/logos/:type/:filename', (req, res) => {

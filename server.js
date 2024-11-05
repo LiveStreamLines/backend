@@ -13,7 +13,7 @@ const projectRoutes = require('./routes/projects');
 const cameraRoutes = require('./routes/cameras');
 const userRoutes = require('./routes/users');
 const cameraPicsRoutes = require ('./routes/camerapics');
-//const videoRoutes = require ('./routes/video');
+const videoRoutes = require ('./routes/video');
 
 
 const app = express();

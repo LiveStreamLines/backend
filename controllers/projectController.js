@@ -1,12 +1,15 @@
 const projectData = require('../data/projectData');
+const developerData = require('../data/developerData'); // To validate developer selection
+const path = require('path');
+const fs = require('fs');
 
-// Controller for getting all Projects
+/// Controller for getting all projects
 function getAllProjects(req, res) {
     const projects = projectData.getAllItems();
     res.json(projects);
 }
 
-// Controller for getting a single Project by ID
+// Controller for getting a single project by ID
 function getProjectById(req, res) {
     const project = projectData.getItemById(req.params.id);
     if (project) {
@@ -30,14 +33,53 @@ function getProjectByDeveloper(req, res) {
 // Controller for adding a new Project
 function addProject(req, res) {
     const newProject = req.body;
+
+    // Check if developer exists
+    const developer = developerData.getItemById(newProject.developerId);
+    if (!developer) {
+        return res.status(400).json({ message: 'Invalid developer ID' });
+    }
+
     const addedProject = projectData.addItem(newProject);
-    res.status(201).json(addedProject);
+
+    if (req.file) {
+        const imageFileName = `${addedProject._id}${path.extname(req.file.originalname)}`;
+        const imageFilePath = path.join(process.env.MEDIA_PATH, 'logos/project/', imageFileName);
+
+        fs.rename(req.file.path, imageFilePath, (err) => {
+            if (err) {
+                console.error('Error saving file:', err);
+                return res.status(500).json({ message: 'Failed to save file' });
+            }
+            const final = projectData.updateItem(addedProject._id, { image: `logos/project/${imageFileName}` });
+            return res.status(201).json(final);
+        });
+    } else {
+        const final = projectData.updateItem(addedProject._id, { image: `` });
+        return res.status(201).json(final);
+    }
 }
 
 // Controller for updating a Project
 function updateProject(req, res) {
-    const updatedProject = projectData.updateItem(req.params.id, req.body);
+    const updatedData = req.body;
+    const projectId = req.params.id;
+
+    // Check if developer exists
+    if (updatedData.developerId) {
+        const developer = developerData.getItemById(updatedData.developerId);
+        if (!developer) {
+            return res.status(400).json({ message: 'Invalid developer ID' });
+        }
+    }
+
+    const updatedProject = projectData.updateItem(projectId, updatedData);
+
     if (updatedProject) {
+        if (req.file) {
+            const imageFileName = `${projectId}${path.extname(req.file.originalname)}`;
+            projectData.updateItem(projectId, { image: `images/project/${imageFileName}` });
+        }
         res.json(updatedProject);
     } else {
         res.status(404).json({ message: 'Project not found' });

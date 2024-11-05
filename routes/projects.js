@@ -6,11 +6,28 @@ const authMiddleware = require('../controllers/authMiddleware');
 
 router.use(authMiddleware);
 
+const multer = require('multer');
+const path = require('path');
+
+// Configure multer for file upload
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, process.env.MEDIA_PATH + '/images/project'); // Directory for project images
+    },
+    filename: (req, file, cb) => {
+        const projectId = req.params.id || req.body.id; // Use id from params if updating, or from body if adding
+        const ext = path.extname(file.originalname);     // Preserve file extension
+        cb(null, `${projectId}${ext}`);                 // Rename file as projectId.ext
+    }
+});
+
+const upload = multer({ storage });
+
 router.get('/', projectController.getAllProjects);
 router.get('/:id', projectController.getProjectById);
 router.get('/dev/:id', projectController.getProjectByDeveloper);
-router.post('/', projectController.addProject);
-router.put('/:id', projectController.updateProject);
+router.post('/', upload.single('image'),projectController.addProject);
+router.put('/:id', upload.single('image'), projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
 
 module.exports = router;

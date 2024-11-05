@@ -12,7 +12,7 @@ const path = require('path');
 // Configure multer for file upload
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, process.env.MEDIA_PATH + '/images/project'); // Directory for project images
+        cb(null, process.env.MEDIA_PATH + '/logos/project'); // Directory for project images
     },
     filename: (req, file, cb) => {
         const projectId = req.params.id || req.body.id; // Use id from params if updating, or from body if adding

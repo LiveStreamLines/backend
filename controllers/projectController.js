@@ -35,7 +35,7 @@ function addProject(req, res) {
     const newProject = req.body;
 
     // Check if developer exists
-    const developer = developerData.getItemById(newProject.developerId);
+    const developer = developerData.getItemById(newProject.developer);
     if (!developer) {
         return res.status(400).json({ message: 'Invalid developer ID' });
     }

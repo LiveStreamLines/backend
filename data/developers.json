@@ -26,5 +26,30 @@
     "createdDate": "2024-10-31T18:36:29.160Z",
     "logo": "logos/developer/f0aa845948fb129c86c08dc7.jpg",
     "isActive": true
+  },
+  {
+    "_id": "7a6a82d1a0ac8a091cbee05e",
+    "developerName": "Test Developer 2",
+    "developerTag": "test2",
+    "description": "This is the description 2",
+    "createdDate": "2024-11-04T23:44:23.712Z",
+    "logo": "logos/developer/7a6a82d1a0ac8a091cbee05e.png"
+  },
+  {
+    "_id": "bb4ef1dcb29622e6153287db",
+    "developerName": "Test Developer",
+    "developerTag": "test",
+    "description": "This is the description",
+    "createdDate": "2024-11-04T23:46:52.355Z",
+    "logo": "logos/developer/bb4ef1dcb29622e6153287db.png"
+  },
+  {
+    "_id": "47e1c080f5c7a5b486c23f9c",
+    "developerName": "updated",
+    "developerTag": "upd",
+    "description": "change to moc",
+    "createdDate": "2024-11-04T23:47:13.929Z",
+    "logo": "logos/developer/47e1c080f5c7a5b486c23f9c.jpg",
+    "isActive": "1"
   }
 ]

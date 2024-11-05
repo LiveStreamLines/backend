@@ -11,7 +11,7 @@ const projectRoutes = require('./routes/projects');
 const cameraRoutes = require('./routes/cameras');
 const userRoutes = require('./routes/users');
 const cameraPicsRoutes = require ('./routes/camerapics');
-const videoRoutes = require ('./routes/video');
+//const videoRoutes = require ('./routes/video');
 
 
 const app = express();
@@ -48,7 +48,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/cameras', cameraRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/camerapics', cameraPicsRoutes);
-app.use('/api/video', videoRoutes);
+//app.use('/api/video', videoRoutes);
 
 
 

@@ -1,21 +1,7 @@
 const developerData = require('../data/developerData');
-const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, '/var/media/logos/developer');  // Target directory for logos
-    },
-    filename: (req, file, cb) => {
-      const developerId = req.params.id || req.body.id; // Use id from params if updating, or from body if adding
-      const ext = path.extname(file.originalname);      // Preserve file extension
-      cb(null, `${developerId}${ext}`);                 // Rename file as developerId.ext
-    }
-  });
-  
-  const upload = multer({ storage });
-  
 
 // Controller for getting all developers
 function getAllDevelopers(req, res) {
@@ -35,36 +21,44 @@ function getDeveloperById(req, res) {
 
 // Controller for adding a new developer
 function addDeveloper(req, res) {
-    try {
-        const newDeveloper = req.body;
-        const addedDeveloper = developerData.addItem(newDeveloper); // Add the developer
+    const newDeveloper = req.body;
+    const addedDeveloper = developerData.addItem(newDeveloper);
 
-        // If there's a logo file, set the file path
-        if (req.file) {
-            const logoPath = `logos/developer/${addedDeveloper.id}${path.extname(req.file.originalname)}`;
-            developerData.updateItem(addedDeveloper.id, { logo: logoPath });
-        }
-
-        res.status(201).json(addedDeveloper);
-  } catch (error) {
-    res.status(500).json({ message: 'Error adding developer', error });
-  }
+    // Check if a file is uploaded
+    if (req.file) {
+        const logoFileName = `${addedDeveloper._id}${path.extname(req.file.originalname)}`;
+        const logoFilePath = path.join('c:/media/logos/developer/', logoFileName);
+        
+        // Move the uploaded file to the specified directory
+        fs.rename(req.file.path, logoFilePath, (err) => {
+            if (err) {
+                console.error('Error renaming file:', err); // Log error details
+                return res.status(500).json({ message: 'Failed to save logo file' });
+            }
+            // Add the logo path to the developer data
+            const final = developerData.updateItem(addedDeveloper._id, { logo: `logos/developer/${logoFileName}` });
+            return res.status(201).json(final);
+        });
+    } else {
+        // Handle case where no logo is uploaded
+        const final = developerData.updateItem(addedDeveloper._id, { logo: `` });
+        return res.status(201).json(final);
+    }
 }
 
 // Controller for updating a developer
 function updateDeveloper(req, res) {
     const updatedData = req.body;
-  const developerId = req.params.id;
+    const developerId = req.params.id;
 
   const updatedDeveloper = developerData.updateItem(developerId, updatedData);
 
   if (updatedDeveloper) {
     // If a new logo file is uploaded, update the logo path
     if (req.file) {
-      const logoPath = `/var/media/logos/developer/${developerId}${path.extname(req.file.originalname)}`;
-      developerData.updateItem(developerId, { logo: logoPath });
+      const logoPath = `${developerId}${path.extname(req.file.originalname)}`;
+      developerData.updateItem(developerId, { logo: `logos/developer/${logoPath}` });
     }
-
     res.json(updatedDeveloper);
   } else {
     res.status(404).json({ message: 'Developer not found' });

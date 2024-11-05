@@ -53,9 +53,9 @@ function generateVideo(req, res) {
   // Use FFmpeg to generate the video using the text file as input
   ffmpeg()
     .input(listFilePath)
-    .inputOptions(['-f concat', '-safe 0', '-r' + finalFrameRate])
+    .inputOptions(['-f concat', '-safe 0', '-r ' + finalFrameRate])
     .outputOptions([
-      '-r' + finalFrameRate, // Set the frame rate
+      '-r ' + finalFrameRate, // Set the frame rate
       '-c:v libx264', // Use H.264 codec
       '-preset slow', // Use a slower preset for better quality
       '-crf 18', // Constant Rate Factor for high quality (lower value = better quality)

@@ -49,6 +49,64 @@ function getCameraPictures (req, res) {
   });
 }
 
+function getCameraPreview(req, res) {
+  const { developerId, projectId, cameraId } = req.params;
+  
+  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
+  
+  if (!fs.existsSync(cameraPath)) {
+    return res.status(404).json({ error: 'Camera directory not found' });
+  }
+
+  const files = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
+  
+  if (files.length === 0) {
+    return res.status(404).json({ error: 'No pictures found in camera directory' });
+  }
+  
+  // Sort files by name to ensure the oldest picture is first
+  const sortedFiles = files.sort();
+  const startDate = sortedFiles[0].slice(0, 8); // Extract date from the first file
+  const startDateObj = new Date(
+    startDate.slice(0, 4), // Year
+    startDate.slice(4, 6) - 1, // Month (zero-based)
+    startDate.slice(6, 8) // Day
+  );
+  
+  const currentDate = new Date();
+  
+  // Collect one image per week starting from the start date up to today
+  const weeklyImages = [];
+  let currentWeekStart = startDateObj;
+  
+  while (currentWeekStart <= currentDate) {
+    const weekStartDate = currentWeekStart.toISOString().slice(0, 10).replace(/-/g, ''); // Get YYYYMMDD for the week
+    const weeklyFiles = sortedFiles.filter(file => file.startsWith(weekStartDate));
+    
+    if (weeklyFiles.length > 0) {
+      // Pick the first image for that week
+      const weeklyImage = weeklyFiles[0];
+      weeklyImages.push({
+        weekStart: weekStartDate,
+        image: weeklyImage.replace('.jpg', ''), // Filename without extension
+      });
+    }
+    
+    // Move to the next week
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  }
+  
+  if (weeklyImages.length === 0) {
+    return res.status(404).json({ error: 'No weekly images found' });
+  }
+
+  res.json({
+    weeklyImages,
+    path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
+  });
+}
+
 module.exports = {
+  getCameraPreview,
   getCameraPictures
 }

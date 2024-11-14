@@ -81,7 +81,11 @@ function getCameraPreview(req, res) {
   
   while (currentWeekStart <= currentDate) {
     const weekStartDate = currentWeekStart.toISOString().slice(0, 10).replace(/-/g, ''); // Get YYYYMMDD for the week
-    const weeklyFiles = sortedFiles.filter(file => file.startsWith(weekStartDate));
+    const weeklyFiles = sortedFiles.filter(file => {
+      const fileDateStr = file.slice(0, 8); // Extract date (YYYYMMDD)
+      const fileTimeStr = file.slice(8, 12); // Extract time (HHMM)
+      return file.startsWith(weekStartDate) && fileTimeStr.startsWith('12'); // Match any time between 12:00 and 12:59
+    });
     
     if (weeklyFiles.length > 0) {
       // Pick the first image for that week

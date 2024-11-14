@@ -85,11 +85,7 @@ function getCameraPreview(req, res) {
     
     if (weeklyFiles.length > 0) {
       // Pick the first image for that week
-      const weeklyImage = weeklyFiles[0];
-      weeklyImages.push({
-        weekStart: weekStartDate,
-        image: weeklyImage.replace('.jpg', ''), // Filename without extension
-      });
+      weeklyImages.push(weeklyFiles[0].replace('.jpg', '')); // Add only the image name without extension
     }
     
     // Move to the next week

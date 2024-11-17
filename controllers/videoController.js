@@ -3,6 +3,8 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const os = require('os');
 const { log } = require('console');
+const videoRequestData = require('../data/videoRequestData');
+
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
 
@@ -142,7 +144,7 @@ function filterPics(req, res) {
     "listFile" : listFileName
   };
   const newRequest = logEntry;
-  const addedCamera = cameraData.addItem(newCamera);
+  const addedRequest = videoRequestData.addItem(newRequest);
 
   // Respond with filtered image count and the list file path
   res.json({

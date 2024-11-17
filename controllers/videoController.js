@@ -128,7 +128,7 @@ function filterPics(req, res) {
     return res.status(404).json({ error: 'No pictures found for the specified date and hour range' });
   }
 
-  let finalFrameRate = frameRate || 25;
+  let finalFrameRate = 25;
   if (duration) {
      finalFrameRate = Math.ceil(numFilteredPics / duration);
   }

@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const os = require('os');
-const { log } = require('console');
 const videoRequestData = require('../data/videoRequestData');
 
 
@@ -99,7 +98,10 @@ function generateCustomId() {
 }
 
 function filterPics(req, res) {
-  const { developerId, projectId, cameraId, date1, date2, hour1, hour2 } = req.body;
+  const { developerId, projectId, cameraId, 
+    date1, date2, hour1, hour2,
+    duration
+  } = req.body;
 
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
@@ -126,6 +128,13 @@ function filterPics(req, res) {
     return res.status(404).json({ error: 'No pictures found for the specified date and hour range' });
   }
 
+  let finalFrameRate = frameRate || 25;
+  if (duration) {
+     finalFrameRate = Math.ceil(numFilteredPics / duration);
+  }
+
+  const startTime = Date.now();
+
   // Create a text file with paths to the filtered images
   const uniqueId = generateCustomId();
   const listFileName = `image_list_${uniqueId}.txt`;
@@ -149,37 +158,30 @@ function filterPics(req, res) {
   // Respond with filtered image count and the list file path
   res.json({
     message: 'Pictures filtered successfully',
-    listFilePath,
+    framerate: finalFrameRate,
+    requestId: uniqueId,
     filteredImageCount: numFilteredPics
   });
 }
 
 function generateVideoFromList(req, res) {
-  const { developerId, projectId, cameraId, listFilePath, frameRate, duration } = req.body;
+  const { developerId, projectId, cameraId, requestId, frameRate, picsCount} = req.body;
 
+  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
+  const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt` );
   // Ensure the list file exists
   if (!fs.existsSync(listFilePath)) {
     return res.status(404).json({ error: 'List file not found' });
   }
 
-  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
-  const filteredFiles = fs.readFileSync(listFilePath, 'utf8').split('\n').length;
-
-  const uniqueVideoName = `video_${uuidv4()}.mp4`;
+  const uniqueVideoName = `video_${requestId}.mp4`;
   const outputVideoPath = path.join(cameraPath, uniqueVideoName);
-
-  let finalFrameRate = frameRate || 25;
-  if (duration && !frameRate) {
-    finalFrameRate = Math.ceil(filteredFiles / duration);
-  }
-
-  const startTime = Date.now();
 
   ffmpeg()
     .input(listFilePath)
-    .inputOptions(['-f concat', '-safe 0', '-r ' + finalFrameRate])
+    .inputOptions(['-f concat', '-safe 0', '-r ' + FrameRate])
     .outputOptions([
-      '-r ' + finalFrameRate,
+      '-r ' + FrameRate,
       '-c:v libx264',
       '-preset slow',
       '-crf 18',
@@ -189,19 +191,8 @@ function generateVideoFromList(req, res) {
     .on('end', () => {
       const endTime = Date.now();
       const timeTaken = (endTime - startTime) / 1000;
-      const videoLength = filteredFiles / finalFrameRate;
+      const videoLength = picsCount / FrameRate;
       const fileSize = fs.statSync(outputVideoPath).size / (1024 * 1024);
-
-      // Log the request
-      const logEntry = {
-        developerId,
-        projectId,
-        cameraId,
-        timeOfRequest: new Date().toISOString(),
-        filteredImageCount: filteredFiles,
-        videoName: uniqueVideoName
-      };
-      logRequest(logFilePath, logEntry);
 
       // Respond with video generation details
       res.json({

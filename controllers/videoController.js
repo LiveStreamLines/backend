@@ -92,7 +92,7 @@ function generateVideo(req, res) {
     .run();
 }
 
-generateCustomId() {
+function generateCustomId() {
   return Array.from(Array(24), () => Math.floor(Math.random() * 16).toString(16)).join('');
 }
 

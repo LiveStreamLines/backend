@@ -101,7 +101,7 @@ function filterPics(req, res) {
 
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
-  const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'video');
+  const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
 
   // Check if the camera directory exists
   if (!fs.existsSync(cameraPath)) {

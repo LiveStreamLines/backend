@@ -179,9 +179,9 @@ function generateVideoFromList(req, res) {
 
   ffmpeg()
     .input(listFilePath)
-    .inputOptions(['-f concat', '-safe 0', '-r ' + FrameRate])
+    .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate])
     .outputOptions([
-      '-r ' + FrameRate,
+      '-r ' + frameRate,
       '-c:v libx264',
       '-preset slow',
       '-crf 18',
@@ -191,7 +191,7 @@ function generateVideoFromList(req, res) {
     .on('end', () => {
       const endTime = Date.now();
       const timeTaken = (endTime - startTime) / 1000;
-      const videoLength = picsCount / FrameRate;
+      const videoLength = picsCount / frameRate;
       const fileSize = fs.statSync(outputVideoPath).size / (1024 * 1024);
 
       // Respond with video generation details

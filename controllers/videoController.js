@@ -200,7 +200,7 @@ function generateVideoFromList(req, res) {
       res.json({
         message: 'Video generated successfully',
         videoPath: outputVideoPath,
-        filteredImageCount: filteredFiles,
+        filteredImageCount: picsCount,
         videoLength: videoLength.toFixed(2) + ' seconds',
         fileSize: fileSize.toFixed(2) + ' MB',
         timeTaken: timeTaken.toFixed(2) + ' seconds'

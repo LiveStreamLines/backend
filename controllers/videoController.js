@@ -92,6 +92,10 @@ function generateVideo(req, res) {
     .run();
 }
 
+generateCustomId() {
+  return Array.from(Array(24), () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+
 function filterPics(req, res) {
   const { developerId, projectId, cameraId, date1, date2, hour1, hour2 } = req.body;
 
@@ -121,7 +125,7 @@ function filterPics(req, res) {
   }
 
   // Create a text file with paths to the filtered images
-  const uniqueId = uuidv4();
+  const uniqueId = generateCustomId();
   const listFileName = `image_list_${uniqueId}.txt`;
   const listFilePath = path.join(videoFolderPath, listFileName);
   const fileListContent = filteredFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');

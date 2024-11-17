@@ -177,6 +177,8 @@ function generateVideoFromList(req, res) {
   const uniqueVideoName = `video_${requestId}.mp4`;
   const outputVideoPath = path.join(cameraPath, uniqueVideoName);
 
+  const startTime = Date.now(); // Track the start time for measuring duration
+
   ffmpeg()
     .input(listFilePath)
     .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate])

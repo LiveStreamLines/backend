@@ -108,11 +108,13 @@ function filterPics(req, res) {
   const developer = developerData.getDeveloperByTag(developerId);
   const project = projectData.getProjectByTag(projectId);
 
+  const developerName = developer.developerName;
+  const projectName = project.projectName;
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
   const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
 
-  return res.status(200).json({developer, project});
+  return res.status(200).json({developerName, projectName});
 
   // Check if the camera directory exists
   if (!fs.existsSync(cameraPath)) {

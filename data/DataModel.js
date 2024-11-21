@@ -94,17 +94,17 @@ class DataModel {
 
     getRequestByDeveloperTag(tag){
         const data = this.readData();
-        return data.filter(item => item.developer == tag)
+        return data.filter(item => item.developer === tag)
     }
 
     getDeveloperByTag(tag) {
         const data = this.readData();
-        return data.filter(item => item.developerTag == tag);
+        return data.filter(item => item.developerTag === tag);
     }
 
     getProjectByTag(tag) {
         const data = this.readData();
-        return data.filter(item => item.projctTag == tag);
+        return data.filter(item => item.projectTag === tag);
     }
 
 }

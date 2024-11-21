@@ -105,8 +105,8 @@ function filterPics(req, res) {
     duration
   } = req.body;
 
-  const developerName = developerData.getDeveloperByTag(developerId);
-  const projectName = projectData.getProjectByTag(projectId);
+  const developer = developerData.getDeveloperByTag(developerId);
+  const project = projectData.getProjectByTag(projectId);
 
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
@@ -151,8 +151,8 @@ function filterPics(req, res) {
   const logEntry = {
     "developerTag": developerId,
     "projectTag": projectId,
-    "developer": developerName,
-    "project": projectName,
+    "developer": developer.developerName,
+    "project": project.projectName,
     "camera": cameraId,
     "startDate": date1,
     "endDate": date2,

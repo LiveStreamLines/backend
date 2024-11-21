@@ -217,9 +217,26 @@ function generateVideoFromList(req, res) {
     .run();
 }
 
+// Controller for getting all developers
+function getAllVideoRequest(req, res) {
+  const videoRequests = videoRequestData.getAllItems();
+  res.json(videoRequests);
+}
+
+function getVideoRequestbyDeveloper(req, res){
+  const videoRequest = videoRequestData.getRequestByDeveloperTag(req.params.tag);
+    if (videoRequest) {
+        res.json(videoRequest);
+    } else {
+        res.status(404).json({ message: 'video Request not found' });
+    }
+}
+
 
 
 module.exports = {
   filterPics,
-  generateVideoFromList
+  generateVideoFromList,
+  getAllVideoRequest,
+  getVideoRequestbyDeveloper
 };

@@ -34,7 +34,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/cameras', cameraRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/camerapics', cameraPicsRoutes);
-app.use('/api/generate', videoRoutes);
+app.use('/api/video', videoRoutes);
 app.use('/api/weather', weatherRoutes);
 
 

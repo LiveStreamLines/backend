@@ -7,6 +7,6 @@ const videoController = require('../controllers/videoController');
 //router.post('/', videoController.generateVideo);
 router.post('/filter', videoController.filterPics);
 router.post('/generate', videoController.generateVideoFromList);
-router.post('/request',videoController.getAllVideoRequest);
+router.get('/request',videoController.getAllVideoRequest);
 
 module.exports = router;

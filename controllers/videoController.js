@@ -108,10 +108,6 @@ function filterPics(req, res) {
   const developer = developerData.getDeveloperByTag(developerId);
   const project = projectData.getProjectByTag(projectId);
 
-  if (!developer || !project) {
-    return res.status(500).json({error: 'no developer or no project'});
-  }
-
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
   const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
@@ -155,8 +151,8 @@ function filterPics(req, res) {
   const logEntry = {
     "developerTag": developerId,
     "projectTag": projectId,
-    "developer": developer.developerName,
-    "project": project.projectName,
+    "developer": developer,
+    "project": project,
     "camera": cameraId,
     "startDate": date1,
     "endDate": date2,

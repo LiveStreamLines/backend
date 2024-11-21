@@ -97,6 +97,16 @@ class DataModel {
         return data.filter(item => item.developer == tag)
     }
 
+    getDeveloperByTag(tag) {
+        const data = this.readData();
+        return data.filter(item => item.developerTag == tag);
+    }
+
+    getProjectByTag(tag) {
+        const data = this.readData();
+        return data.filter(item => item.projctTag == tag);
+    }
+
 }
 
 module.exports = DataModel;

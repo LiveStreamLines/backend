@@ -3,6 +3,8 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const os = require('os');
 const videoRequestData = require('../data/videoRequestData');
+const developerData = require('../data/developerData');
+const projectData = require('../data/projectData');
 
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
@@ -103,6 +105,9 @@ function filterPics(req, res) {
     duration
   } = req.body;
 
+  const developerName = developerData.getDeveloperByTag(developerId);
+  const projectName = projectData.getProjectByTag(projectId);
+
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
   const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
@@ -144,8 +149,10 @@ function filterPics(req, res) {
 
   // Log the request
   const logEntry = {
-    "developer": developerId,
-    "project": projectId,
+    "developerTag": developerId,
+    "projectTag": projectId,
+    "developer": developerName,
+    "project": projectName,
     "camera": cameraId,
     "startDate": date1,
     "endDate": date2,

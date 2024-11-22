@@ -142,8 +142,6 @@ function filterPics(req, res) {
      finalFrameRate = Math.ceil(numFilteredPics / duration);
   }
 
-  const startTime = Date.now();
-
   // Create a text file with paths to the filtered images
   const uniqueId = generateCustomId();
   const listFileName = `image_list_${uniqueId}.txt`;
@@ -164,6 +162,7 @@ function filterPics(req, res) {
     "endHour": hour2,
     "RequestTime": new Date().toISOString(),
     "filteredImageCount": numFilteredPics,
+    "frameRate": finalFrameRate,
     "id": uniqueId,
     "listFile" : listFileName,
     "status": "queued"
@@ -189,14 +188,14 @@ function processQueue() {
   if (!queuedRequest) return; // No queued requests
 
   // Update the status to starting
+  console.log(`Starting video generation for request ID: ${queuedRequest._id}`);
   queuedRequest.status = 'starting';
   videoRequestData.updateItem(queuedRequest._id, { status: 'starting' });
 
   processing = true; // Mark as processing
 
   // Invoke generateVideoFromList
-  const { developerTag, projectTag, camera, id: requestId, filteredImageCount } = queuedRequest;
-  const frameRate = 25; // Example frame rate
+  const { developerTag, projectTag, camera, id: requestId, filteredImageCount, frameRate } = queuedRequest;
   const requestPayload = {
     developerId: developerTag,
     projectId: projectTag,
@@ -206,11 +205,14 @@ function processQueue() {
     picsCount: filteredImageCount,
   };
 
-  generateVideoFromList(requestPayload, () => {
-    // Mark the request as ready when done
-    queuedRequest.status = 'ready';
-    videoRequestData.updateItem(queuedRequest._id, { status: 'ready' });
-
+  generateVideoFromList(requestPayload, (error) => {
+    if (error) {
+      console.error(`Video generation failed for request ID: ${requestId}`);
+      videoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
+    } else {
+      console.log(`Video generation completed for request ID: ${requestId}`);
+      videoRequestData.updateItem(queuedRequest._id, { status: 'ready' });
+    }
     processing = false; // Mark as not processing
 
     // Process the next request in the queue
@@ -254,11 +256,11 @@ function generateVideoFromList(payload, callback) {
         timeTaken: timeTaken.toFixed(2) + ' seconds'
       }
       console.log(videolog);
-      callback();
+      callback(null);
     })
     .on('error', err => {
       console.error(err);
-      callback();
+      callback(err);
     })
     .run();
 }

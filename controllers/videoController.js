@@ -209,7 +209,7 @@ function processQueue() {
   generateVideoFromList(requestPayload, () => {
     // Mark the request as ready when done
     queuedRequest.status = 'ready';
-    videoRequestData.updateItem(queuedRequest.id, { status: 'ready' });
+    videoRequestData.updateItem(queuedRequest._id, { status: 'ready' });
 
     processing = false; // Mark as not processing
 

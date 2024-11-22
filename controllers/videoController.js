@@ -6,8 +6,10 @@ const videoRequestData = require('../data/videoRequestData');
 const developerData = require('../data/developerData');
 const projectData = require('../data/projectData');
 
-
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
+let processing = false; // Global flag to check if a request is being processed
+
+
 
 function generateVideo(req, res) {
   const { developerId, projectId, cameraId, date1, date2, hour1, hour2, frameRate, duration } = req.body;
@@ -163,10 +165,12 @@ function filterPics(req, res) {
     "RequestTime": new Date().toISOString(),
     "filteredImageCount": numFilteredPics,
     "id": uniqueId,
-    "listFile" : listFileName
+    "listFile" : listFileName,
+    "status": "queued"
   };
   const newRequest = logEntry;
   const addedRequest = videoRequestData.addItem(newRequest);
+  processQueue();
 
   // Respond with filtered image count and the list file path
   res.json({
@@ -177,16 +181,49 @@ function filterPics(req, res) {
   });
 }
 
-function generateVideoFromList(req, res) {
-  const { developerId, projectId, cameraId, requestId, frameRate, picsCount} = req.body;
+function processQueue() {
+  if (processing) return; // Skip if already processing another request
+
+  // Get the next queued request
+  const queuedRequest = videoRequestData.getAllItems().find((request) => request.status === 'queued');
+  if (!queuedRequest) return; // No queued requests
+
+  // Update the status to starting
+  queuedRequest.status = 'starting';
+  videoRequestData.updateItem(queuedRequest.id, { status: 'starting' });
+
+  processing = true; // Mark as processing
+
+  // Invoke generateVideoFromList
+  const { developerTag, projectTag, camera, id: requestId, filteredImageCount } = queuedRequest;
+  const frameRate = 25; // Example frame rate
+  const requestPayload = {
+    developerId: developerTag,
+    projectId: projectTag,
+    cameraId: camera,
+    requestId,
+    frameRate,
+    picsCount: filteredImageCount,
+  };
+
+  generateVideoFromList(requestPayload, () => {
+    // Mark the request as ready when done
+    queuedRequest.status = 'ready';
+    videoRequestData.updateItem(queuedRequest.id, { status: 'ready' });
+
+    processing = false; // Mark as not processing
+
+    // Process the next request in the queue
+    processQueue();
+  });
+}
+
+
+function generateVideoFromList(payload, callback) {
+  const { developerId, projectId, cameraId, requestId, frameRate, picsCount} = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt` );
-  // Ensure the list file exists
-  if (!fs.existsSync(listFilePath)) {
-    return res.status(404).json({ error: 'List file not found' });
-  }
-
   const uniqueVideoName = `video_${requestId}.mp4`;
   const outputVideoPath = path.join(cameraPath, uniqueVideoName);
 
@@ -208,20 +245,20 @@ function generateVideoFromList(req, res) {
       const timeTaken = (endTime - startTime) / 1000;
       const videoLength = picsCount / frameRate;
       const fileSize = fs.statSync(outputVideoPath).size / (1024 * 1024);
-
-      // Respond with video generation details
-      res.json({
+      const videolog = {
         message: 'Video generated successfully',
         videoPath: outputVideoPath,
         filteredImageCount: picsCount,
         videoLength: videoLength.toFixed(2) + ' seconds',
         fileSize: fileSize.toFixed(2) + ' MB',
         timeTaken: timeTaken.toFixed(2) + ' seconds'
-      });
+      }
+      console.log(videolog);
+      callback();
     })
     .on('error', err => {
       console.error(err);
-      res.status(500).json({ error: 'Failed to generate video' });
+      callback();
     })
     .run();
 }
@@ -229,7 +266,10 @@ function generateVideoFromList(req, res) {
 // Controller for getting all developers
 function getAllVideoRequest(req, res) {
   const videoRequests = videoRequestData.getAllItems();
-  res.json(videoRequests);
+  res.json(videoRequests.map((request) => ({
+    ...request,
+    videoPath: request.status === 'ready' ? `/videos/${request.id}.mp4` : null,
+  })));
 }
 
 function getVideoRequestbyDeveloper(req, res){

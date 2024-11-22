@@ -190,7 +190,7 @@ function processQueue() {
 
   // Update the status to starting
   queuedRequest.status = 'starting';
-  videoRequestData.updateItem(queuedRequest.id, { status: 'starting' });
+  videoRequestData.updateItem(queuedRequest._id, { status: 'starting' });
 
   processing = true; // Mark as processing
 

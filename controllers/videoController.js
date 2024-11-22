@@ -185,7 +185,10 @@ function processQueue() {
 
   // Get the next queued request
   const queuedRequest = videoRequestData.getAllItems().find((request) => request.status === 'queued');
-  if (!queuedRequest) return; // No queued requests
+  if (!queuedRequest) {
+    console.log('No queued requests found.');
+    return; // No queued requests
+  }
 
   // Update the status to starting
   console.log(`Starting video generation for request ID: ${queuedRequest._id}`);
@@ -211,7 +214,14 @@ function processQueue() {
       videoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
     } else {
       console.log(`Video generation completed for request ID: ${requestId}`);
-      videoRequestData.updateItem(queuedRequest._id, { status: 'ready' });
+       // Update the request with additional video details
+       videoRequestData.updateItem(queuedRequest._id, {
+        status: 'ready',
+        videoPath: videoDetails.videoPath,
+        videoLength: videoDetails.videoLength,
+        fileSize: videoDetails.fileSize,
+        timeTaken: videoDetails.timeTaken,
+      });
     }
     processing = false; // Mark as not processing
 
@@ -247,20 +257,21 @@ function generateVideoFromList(payload, callback) {
       const timeTaken = (endTime - startTime) / 1000;
       const videoLength = picsCount / frameRate;
       const fileSize = fs.statSync(outputVideoPath).size / (1024 * 1024);
-      const videolog = {
-        message: 'Video generated successfully',
+      
+      const videoDetails = {
         videoPath: outputVideoPath,
-        filteredImageCount: picsCount,
         videoLength: videoLength.toFixed(2) + ' seconds',
         fileSize: fileSize.toFixed(2) + ' MB',
-        timeTaken: timeTaken.toFixed(2) + ' seconds'
-      }
-      console.log(videolog);
-      callback(null);
+        timeTaken: timeTaken.toFixed(2) + ' seconds',
+      };
+      
+      console.log('Video generation details:', videoDetails);
+
+      callback(null, videoDetails); // Notify success with video details
     })
     .on('error', err => {
-      console.error(err);
-      callback(err);
+      console.error(`Error generating video for request ID: ${requestId}:`, err);
+      callback(err, null); // Notify failure
     })
     .run();
 }

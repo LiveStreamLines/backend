@@ -208,7 +208,7 @@ function processQueue() {
     picsCount: filteredImageCount,
   };
 
-  generateVideoFromList(requestPayload, (error) => {
+  generateVideoFromList(requestPayload, (error, videoDetails) => {
     if (error) {
       console.error(`Video generation failed for request ID: ${requestId}`);
       videoRequestData.updateItem(queuedRequest._id, { status: 'failed' });

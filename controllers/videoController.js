@@ -206,6 +206,7 @@ function processQueue() {
     requestId,
     frameRate,
     picsCount: filteredImageCount,
+    showdate: true
   };
 
   generateVideoFromList(requestPayload, (error, videoDetails) => {
@@ -232,16 +233,42 @@ function processQueue() {
 
 
 function generateVideoFromList(payload, callback) {
-  const { developerId, projectId, cameraId, requestId, frameRate, picsCount} = payload;
+  const { developerId, projectId, cameraId, requestId, frameRate, picsCount, showdate} = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt` );
+  const filterScriptPath = path.join(cameraPath, `filter_script_${requestId}.txt`);
+
   const uniqueVideoName = `video_${requestId}.mp4`;
   const outputVideoPath = path.join(cameraPath, uniqueVideoName);
 
   const startTime = Date.now(); // Track the start time for measuring duration
 
-  ffmpeg()
+   // Generate `filter_script.txt` if `showDate` is true
+  if (showdate) {
+    // Read image paths from `image_list.txt`
+    const imageListContent = fs.readFileSync(listFilePath, 'utf-8');
+
+    // Extract filenames from the list
+    const imageFiles = imageListContent
+      .split('\n') // Split by newlines
+      .map(line => line.replace(/^file\s+'(.+)'$/, '$1')) // Extract filenames from the format `file 'filename'`
+      .filter(Boolean); // Remove empty lines
+
+    // Generate `filter_script.txt` content
+    const filterScriptContent = imageFiles.map((filePath, index) => {
+      const fileName = path.basename(filePath); // Extract the filename
+      const fileDate = fileName.substring(0, 8); // Extract YYYYMMDD from filename
+      const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
+      return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
+    }).join(',');
+
+    // Write to the `filter_script.txt`
+    fs.writeFileSync(filterScriptPath, filterScriptContent);
+  }
+
+
+  const ffmpegCommand = ffmpeg()
     .input(listFilePath)
     .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate])
     .outputOptions([
@@ -249,9 +276,21 @@ function generateVideoFromList(payload, callback) {
       '-c:v libx264',
       '-preset slow',
       '-crf 18',
-      '-pix_fmt yuv420p'
-    ])
+      '-pix_fmt yuv420p',
+    ]);
+
+     // Apply `filter_complex_script` if `showDate` is true
+  if (showdate) {
+    const filterScriptContent = fs.readFileSync(filterScriptPath, 'utf-8');
+
+    // Apply the filter script directly as a string
+    ffmpegCommand.complexFilter(filterScriptContent);
+  
+  }
+
+  ffmpegCommand
     .output(outputVideoPath)
+    .on('start', command => console.log(`FFmpeg Command: ${command}`))
     .on('end', () => {
       const endTime = Date.now();
       const timeTaken = (endTime - startTime) / 1000;

@@ -7,95 +7,11 @@ const developerData = require('../data/developerData');
 const projectData = require('../data/projectData');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
+const batchSize = 200; // Number of images per batch for processing
+
 let processing = false; // Global flag to check if a request is being processed
 
 
-
-function generateVideo(req, res) {
-  const { developerId, projectId, cameraId, date1, date2, hour1, hour2, frameRate, duration } = req.body;
-
-  // Define the camera folder path
-  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
-
-  // Check if the camera directory exists
-  if (!fs.existsSync(cameraPath)) {
-    return res.status(404).json({ error: 'Camera directory not found' });
-  }
-
-  // Read all image files in the camera directory
-  const allFiles = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
-
-  // Filter files based on date and hour range
-  const filteredFiles = allFiles.filter(file => {
-    const fileDate = file.substring(0, 8); // Extract YYYYMMDD from filename
-    const fileHour = file.substring(8, 10); // Extract HH from filename
-    return fileDate >= date1 && fileDate <= date2 && fileHour >= hour1 && fileHour <= hour2;
-  });
-
-  const numFilteredPics = filteredFiles.length;
-
-  if (numFilteredPics === 0) {
-    return res.status(404).json({ error: 'No pictures found for the specified date and hour range' });
-  }
-
-  // Create a text file with paths to the filtered images
-  const listFilePath = path.join(os.tmpdir(), 'image_list.txt');
-  const fileListContent = filteredFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
-  fs.writeFileSync(listFilePath, fileListContent);
-
-  // Define the output video path
-  const outputVideoPath = path.join(cameraPath, 'output_video.mp4');
-
-  // Determine frame rate or calculate based on duration
-  let finalFrameRate = frameRate || 25; // Default to 25 fps if frameRate is not provided
-
-  // Adjust frame rate if duration is specified
-  if (duration && !frameRate) {
-    finalFrameRate = Math.ceil(numFilteredPics / duration);
-  }
-
-  const startTime = Date.now(); // Track the start time for measuring duration
-
-  // Use FFmpeg to generate the video using the text file as input
-  ffmpeg()
-    .input(listFilePath)
-    .inputOptions(['-f concat', '-safe 0', '-r ' + finalFrameRate])
-    .outputOptions([
-      '-r ' + finalFrameRate, // Set the frame rate
-      '-c:v libx264', // Use H.264 codec
-      '-preset slow', // Use a slower preset for better quality
-      '-crf 18', // Constant Rate Factor for high quality (lower value = better quality)
-      '-pix_fmt yuv420p' // Pixel format for compatibility
-    ])
-    .output(outputVideoPath)
-    .on('end', () => {
-      const endTime = Date.now();
-      const timeTaken = (endTime - startTime) / 1000; // Time taken in seconds
-      const videoLength = numFilteredPics / finalFrameRate; // Length of the video in seconds
-
-      // Get the size of the output video file
-      const fileSize = fs.statSync(outputVideoPath).size / (1024 * 1024); // Size in MB
-
-      // Delete the list file after the video is generated
-      fs.unlinkSync(listFilePath);
-
-      // Send the response with additional information
-      res.json({
-        message: 'Video generated successfully',
-        videoPath: outputVideoPath,
-        filteredImageCount: numFilteredPics,
-        videoLength: videoLength.toFixed(2) + ' seconds',
-        fileSize: fileSize.toFixed(2) + ' MB',
-        timeTaken: timeTaken.toFixed(2) + ' seconds'
-      });
-    })
-    .on('error', err => {
-      console.error(err);
-      fs.unlinkSync(listFilePath); // Clean up on error
-      res.status(500).json({ error: 'Failed to generate video' });
-    })
-    .run();
-}
 
 function generateCustomId() {
   return Array.from(Array(24), () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -104,7 +20,7 @@ function generateCustomId() {
 function filterPics(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
-    duration
+    duration, showdate = true
   } = req.body;
 
   const developer = developerData.getDeveloperByTag(developerId);
@@ -209,7 +125,7 @@ function processQueue() {
     showdate: true
   };
 
-  generateVideoFromList(requestPayload, (error, videoDetails) => {
+  processVideoInChunks(requestPayload, (error, videoDetails) => {
     if (error) {
       console.error(`Video generation failed for request ID: ${requestId}`);
       videoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
@@ -232,88 +148,90 @@ function processQueue() {
 }
 
 
-function generateVideoFromList(payload, callback) {
+function processVideoInChunks(payload, callback) {
   const { developerId, projectId, cameraId, requestId, frameRate, picsCount, showdate} = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
-  const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt` );
-  const filterScriptPath = path.join(cameraPath, `filter_script_${requestId}.txt`);
+  const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
+  const partialVideos = [];
+  const batchCount = Math.ceil(filteredFiles / batchSize);
 
-  const uniqueVideoName = `video_${requestId}.mp4`;
-  const outputVideoPath = path.join(cameraPath, uniqueVideoName);
+  const processBatch = (batchIndex) => {
+    if (batchIndex >= batchCount) {
+      concatenateVideos(partialVideos, outputVideoPath, callback);
+      return;
+    }
 
-  const startTime = Date.now(); // Track the start time for measuring duration
+    const batchListPath = path.join(cameraPath, `batch_list_${requestId}_${batchIndex}.txt`);
+    const batchFiles = filteredFiles.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+    const fileListContent = batchFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
+    fs.writeFileSync(batchListPath, fileListContent);
 
-   // Generate `filter_script.txt` if `showDate` is true
-  if (showdate) {
-    // Read image paths from `image_list.txt`
-    const imageListContent = fs.readFileSync(listFilePath, 'utf-8');
+    const batchVideoPath = path.join(cameraPath, `batch_video_${requestId}_${batchIndex}.mp4`);
+    partialVideos.push(batchVideoPath);
 
-    // Extract filenames from the list
-    const imageFiles = imageListContent
-      .split('\n') // Split by newlines
-      .map(line => line.replace(/^file\s+'(.+)'$/, '$1')) // Extract filenames from the format `file 'filename'`
-      .filter(Boolean); // Remove empty lines
+    const ffmpegCommand = ffmpeg()
+      .input(batchListPath)
+      .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate])
+      .outputOptions([
+        '-r ' + frameRate,
+        '-c:v libx264',
+        '-preset slow',
+        '-crf 18',
+        '-pix_fmt yuv420p',
+      ]);
 
-    // Generate `filter_script.txt` content
-    const filterScriptContent = imageFiles.map((filePath, index) => {
-      const fileName = path.basename(filePath); // Extract the filename
-      const fileDate = fileName.substring(0, 8); // Extract YYYYMMDD from filename
-      const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
-      return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
-    }).join(',');
+    if (showdate) {
+      const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
+      const filterScriptContent = batchFiles.map((file, index) => {
+        const fileDate = file.substring(0, 8);
+        const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
+        return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
+      }).join(',');
 
-    // Write to the `filter_script.txt`
-    fs.writeFileSync(filterScriptPath, filterScriptContent);
-  }
+      fs.writeFileSync(filterScriptPath, filterScriptContent);
+      ffmpegCommand.complexFilter(filterScriptContent);
+    }
 
+    ffmpegCommand
+      .output(batchVideoPath)
+      .on('end', () => {
+        console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);
+        processBatch(batchIndex + 1);
+      })
+      .on('error', err => {
+        console.error(`Error processing batch ${batchIndex}:`, err);
+        callback(err, null);
+      })
+      .run();
+  };
 
-  const ffmpegCommand = ffmpeg()
-    .input(listFilePath)
-    .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate])
-    .outputOptions([
-      '-r ' + frameRate,
-      '-c:v libx264',
-      '-preset slow',
-      '-crf 18',
-      '-pix_fmt yuv420p',
-    ]);
+  processBatch(0);
 
-     // Apply `filter_complex_script` if `showDate` is true
-  if (showdate) {
-    const filterScriptContent = fs.readFileSync(filterScriptPath, 'utf-8');
+}
 
-    // Apply the filter script directly as a string
-    ffmpegCommand.complexFilter(filterScriptContent);
-  
-  }
+function concatenateVideos(videoPaths, outputVideoPath, callback) {
+  const concatListPath = path.join(path.dirname(outputVideoPath), `concat_list.txt`);
+  const concatContent = videoPaths.map(video => `file '${video}'`).join('\n');
+  fs.writeFileSync(concatListPath, concatContent);
 
-  ffmpegCommand
+  ffmpeg()
+    .input(concatListPath)
+    .inputOptions(['-f concat', '-safe 0'])
+    .outputOptions(['-c copy'])
     .output(outputVideoPath)
-    .on('start', command => console.log(`FFmpeg Command: ${command}`))
     .on('end', () => {
-      const endTime = Date.now();
-      const timeTaken = (endTime - startTime) / 1000;
-      const videoLength = picsCount / frameRate;
-      const fileSize = fs.statSync(outputVideoPath).size / (1024 * 1024);
-      
-      const videoDetails = {
-        videoPath: outputVideoPath,
-        videoLength: videoLength.toFixed(2) + ' seconds',
-        fileSize: fileSize.toFixed(2) + ' MB',
-        timeTaken: timeTaken.toFixed(2) + ' seconds',
-      };
-      
-      console.log('Video generation details:', videoDetails);
-
-      callback(null, videoDetails); // Notify success with video details
+      videoPaths.forEach(video => fs.unlinkSync(video));
+      fs.unlinkSync(concatListPath);
+      callback(null, { videoPath: outputVideoPath });
     })
     .on('error', err => {
-      console.error(`Error generating video for request ID: ${requestId}:`, err);
-      callback(err, null); // Notify failure
+      console.error('Error concatenating videos:', err);
+      callback(err, null);
     })
     .run();
 }
+
 
 // Controller for getting all developers
 function getAllVideoRequest(req, res) {
@@ -323,6 +241,7 @@ function getAllVideoRequest(req, res) {
     videoPath: request.status === 'ready' ? `/videos/${request.id}.mp4` : null,
   })));
 }
+
 
 function getVideoRequestbyDeveloper(req, res){
   const videoRequest = videoRequestData.getRequestByDeveloperTag(req.params.tag);
@@ -337,7 +256,6 @@ function getVideoRequestbyDeveloper(req, res){
 
 module.exports = {
   filterPics,
-  generateVideoFromList,
   getAllVideoRequest,
   getVideoRequestbyDeveloper
 };

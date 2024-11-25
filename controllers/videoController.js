@@ -153,8 +153,21 @@ function processVideoInChunks(payload, callback) {
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
+  const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt`);
   const partialVideos = [];
-  const batchCount = Math.ceil(picsCount / batchSize);
+
+    // Read `filteredFiles` dynamically from the text file
+    if (!fs.existsSync(listFilePath)) {
+      return callback(new Error(`List file not found: ${listFilePath}`), null);
+    }
+
+    const filteredFiles = fs
+      .readFileSync(listFilePath, 'utf-8')
+      .split('\n')
+      .map(line => line.replace(/^file\s+'(.+)'$/, '$1').trim())
+      .filter(Boolean);
+
+    const batchCount = Math.ceil(filteredFiles.length / batchSize);
 
   const processBatch = (batchIndex) => {
     if (batchIndex >= batchCount) {
@@ -162,13 +175,18 @@ function processVideoInChunks(payload, callback) {
       return;
     }
 
-    const batchListPath = path.join(cameraPath, `batch_list_${requestId}_${batchIndex}.txt`);
     const batchFiles = filteredFiles.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
-    const fileListContent = batchFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
-    fs.writeFileSync(batchListPath, fileListContent);
+    if (batchFiles.length === 0) {
+      processBatch(batchIndex + 1);
+      return;
+    }
 
+    const batchListPath = path.join(cameraPath, `batch_list_${requestId}_${batchIndex}.txt`);
     const batchVideoPath = path.join(cameraPath, `batch_video_${requestId}_${batchIndex}.mp4`);
     partialVideos.push(batchVideoPath);
+
+    const fileListContent = batchFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
+    fs.writeFileSync(batchListPath, fileListContent);
 
     const ffmpegCommand = ffmpeg()
       .input(batchListPath)

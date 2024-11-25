@@ -154,7 +154,7 @@ function processVideoInChunks(payload, callback) {
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
   const partialVideos = [];
-  const batchCount = Math.ceil(filteredFiles / batchSize);
+  const batchCount = Math.ceil(picsCount / batchSize);
 
   const processBatch = (batchIndex) => {
     if (batchIndex >= batchCount) {

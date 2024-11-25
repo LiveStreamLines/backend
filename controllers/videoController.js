@@ -147,27 +147,26 @@ function processQueue() {
   });
 }
 
-
 function processVideoInChunks(payload, callback) {
-  const { developerId, projectId, cameraId, requestId, frameRate, picsCount, showdate} = payload;
+  const { developerId, projectId, cameraId, requestId, frameRate, showdate } = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
   const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt`);
   const partialVideos = [];
 
-    // Read `filteredFiles` dynamically from the text file
-    if (!fs.existsSync(listFilePath)) {
-      return callback(new Error(`List file not found: ${listFilePath}`), null);
-    }
+  // Read `filteredFiles` dynamically from the text file
+  if (!fs.existsSync(listFilePath)) {
+    return callback(new Error(`List file not found: ${listFilePath}`), null);
+  }
 
-    const filteredFiles = fs
-      .readFileSync(listFilePath, 'utf-8')
-      .split('\n')
-      .map(line => line.replace(/^file\s+'(.+)'$/, '$1').trim())
-      .filter(Boolean);
+  const filteredFiles = fs
+    .readFileSync(listFilePath, 'utf-8')
+    .split('\n')
+    .map(line => line.replace(/^file\s+'(.+)'$/, '$1').trim())
+    .filter(Boolean);
 
-    const batchCount = Math.ceil(filteredFiles.length / batchSize);
+  const batchCount = Math.ceil(filteredFiles.length / batchSize);
 
   const processBatch = (batchIndex) => {
     if (batchIndex >= batchCount) {
@@ -185,8 +184,13 @@ function processVideoInChunks(payload, callback) {
     const batchVideoPath = path.join(cameraPath, `batch_video_${requestId}_${batchIndex}.mp4`);
     partialVideos.push(batchVideoPath);
 
-    const fileListContent = batchFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
+    // Corrected: Use file paths directly
+    const fileListContent = batchFiles.map(file => `file '${file}'`).join('\n');
     fs.writeFileSync(batchListPath, fileListContent);
+
+    // Log for debugging
+    console.log(`Batch list file for batch ${batchIndex}:`);
+    console.log(fileListContent);
 
     const ffmpegCommand = ffmpeg()
       .input(batchListPath)
@@ -202,7 +206,8 @@ function processVideoInChunks(payload, callback) {
     if (showdate) {
       const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
       const filterScriptContent = batchFiles.map((file, index) => {
-        const fileDate = file.substring(0, 8);
+        const fileName = path.basename(file);
+        const fileDate = fileName.substring(0, 8);
         const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
         return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
       }).join(',');
@@ -213,6 +218,7 @@ function processVideoInChunks(payload, callback) {
 
     ffmpegCommand
       .output(batchVideoPath)
+      .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}: ${command}`))
       .on('end', () => {
         console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);
         processBatch(batchIndex + 1);
@@ -225,8 +231,8 @@ function processVideoInChunks(payload, callback) {
   };
 
   processBatch(0);
-
 }
+
 
 function concatenateVideos(videoPaths, outputVideoPath, callback) {
   const concatListPath = path.join(path.dirname(outputVideoPath), `concat_list.txt`);

@@ -20,8 +20,11 @@ function generateCustomId() {
 function filterPics(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
-    duration, showdate = true
+    duration, showdate = false, showedText = '', showedWatermark = '', resolution = '720'
   } = req.body;
+
+ const logo = req.file ? req.file.path : null;
+
 
   const developer = developerData.getDeveloperByTag(developerId);
   const project = projectData.getProjectByTag(projectId);
@@ -79,6 +82,11 @@ function filterPics(req, res) {
     "RequestTime": new Date().toISOString(),
     "filteredImageCount": numFilteredPics,
     "frameRate": finalFrameRate,
+    resolution,
+    showdate,
+    showedText,
+    showedWatermark,
+    logo: logo,
     "id": uniqueId,
     "listFile" : listFileName,
     "status": "queued"
@@ -114,7 +122,8 @@ function processQueue() {
   processing = true; // Mark as processing
 
   // Invoke generateVideoFromList
-  const { developerTag, projectTag, camera, id: requestId, filteredImageCount, frameRate } = queuedRequest;
+  const { developerTag, projectTag, camera, id: requestId, filteredImageCount, 
+          frameRate, resolution, showdate, showedText, showedWatermark, logo } = queuedRequest;
   const requestPayload = {
     developerId: developerTag,
     projectId: projectTag,
@@ -122,7 +131,11 @@ function processQueue() {
     requestId,
     frameRate,
     picsCount: filteredImageCount,
-    showdate: true
+    resolution,
+    showdate,
+    showedText,
+    showedWatermark,
+    logo
   };
 
   processVideoInChunks(requestPayload, (error, videoDetails) => {
@@ -148,7 +161,7 @@ function processQueue() {
 }
 
 function processVideoInChunks(payload, callback) {
-  const { developerId, projectId, cameraId, requestId, frameRate, showdate } = payload;
+  const { developerId, projectId, cameraId, requestId, frameRate, resolution, showdate, showedText, showedWatermark, logo } = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
@@ -190,20 +203,31 @@ function processVideoInChunks(payload, callback) {
 
     // Log for debugging
     console.log(`Batch list file for batch ${batchIndex}:`);
-    console.log(fileListContent);
+    
+    console.log(logo);
+
+    const batchListPathl = batchListPath.replace(/\\/g, '/');
+    const logol = logo.replace(/\\/g, '/');
+    const batchVideoPathl = batchVideoPath.replace(/\\/g, '/');
 
     const ffmpegCommand = ffmpeg()
-      .input(batchListPath)
-      .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate])
-      .outputOptions([
-        '-r ' + frameRate,
-        '-c:v libx264',
-        '-preset slow',
-        '-crf 18',
-        '-pix_fmt yuv420p',
-      ]);
+      .input(batchListPathl)
+      .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate]);
 
-    if (showdate) {
+    if (logo) {
+      ffmpegCommand.input(logol);
+    }
+
+    let addFilterComplex = false; // Track if we need to add -filter_complex
+    const drawtextFilters = [];
+
+    // Ensure the input video dimensions are divisible by 2
+    drawtextFilters.push(`[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2[scaled]`);
+
+    // Build the combined filter chain
+    let combinedFilters = '';
+    // Add filters dynamically based on options
+    if (showdate === 'true') {
       const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
       const filterScriptContent = batchFiles.map((file, index) => {
         const fileName = path.basename(file);
@@ -211,13 +235,54 @@ function processVideoInChunks(payload, callback) {
         const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
         return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
       }).join(',');
+      
 
+      // filterScriptPathl = filterScriptPath.replace(/\\/g, '/');
       fs.writeFileSync(filterScriptPath, filterScriptContent);
-      ffmpegCommand.complexFilter(filterScriptContent);
+      //combinedFilters += `drawtext=textfile='${filterScriptPathl}'`;
+      combinedFilters += `${filterScriptContent}`;
+      addFilterComplex = true;
     }
 
+    if (showedText) {
+      if (combinedFilters) combinedFilters += ',';
+      combinedFilters += `drawtext=text='${showedText}':x=(w-text_w)/2:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5`;
+      addFilterComplex = true;
+    }
+
+    if (showedWatermark) {
+      if (combinedFilters) combinedFilters += ',';
+      combinedFilters += `drawtext=text='${showedWatermark}':x=w/2-text_w/2:y=h/2-text_h/2:fontsize=120:fontcolor=white:alpha=0.3:borderw=2:bordercolor=black`;
+      addFilterComplex = true;
+    }
+
+    // Add combined filters to the filter_complex
+    if (combinedFilters) {
+      drawtextFilters.push(`[scaled]${combinedFilters}[base]`);
+    }
+
+    // Add logo overlay if needed
+    if (logo) {
+      drawtextFilters.push(`[1:v]scale=200:200[logo];[base][logo]overlay=W-w-10:10`);
+      addFilterComplex = true;
+    }
+
+    // Apply the filter_complex if filters are added
+    if (addFilterComplex) {
+      const filterComplexString = `${drawtextFilters.join(';')}`;
+      ffmpegCommand.addOption('-filter_complex', filterComplexString);
+    }
+
+    // Add output options
     ffmpegCommand
-      .output(batchVideoPath)
+      .outputOptions([
+        '-r ' + frameRate,
+        '-c:v libx264',
+        '-preset slow',
+        '-crf 18',
+        '-pix_fmt yuv420p',
+      ])
+      .output(batchVideoPathl)
       .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}: ${command}`))
       .on('end', () => {
         console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);

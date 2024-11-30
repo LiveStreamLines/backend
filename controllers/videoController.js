@@ -208,6 +208,17 @@ function processVideoInChunks(payload, callback) {
 
     //console.log(logo);
 
+    const resolutionMap = {
+      '720': { width: 1280, height: 720 },
+      'HD': { width: 1920, height: 1080 },
+      '4K': { width: 3840, height: 2160 },
+    };
+    
+    const selectedResolution = resolutionMap[resolution] || resolutionMap['HD']; // Default to HD if not specified
+    const resolutionWidth = selectedResolution.width;
+    const resolutionHeight = selectedResolution.height;
+    
+
     const ffmpegCommand = ffmpeg()
       .input(batchListPathl)
       .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate]);
@@ -221,7 +232,7 @@ function processVideoInChunks(payload, callback) {
     const drawtextFilters = [];
 
     // Ensure the input video dimensions are divisible by 2
-    drawtextFilters.push(`[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2[scaled]`);
+    drawtextFilters.push(`[0:v]scale=${resolutionWidth}:${resolutionHeight}[scaled]`);
 
     // Build the combined filter chain
     let combinedFilters = '';

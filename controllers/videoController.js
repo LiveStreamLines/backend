@@ -259,7 +259,12 @@ function processVideoInChunks(payload, callback) {
     let nologo = true;
     // Add combined filters to the filter_complex
     if (combinedFilters.trim() !== "") {
-      drawtextFilters.push(`[scaled]${combinedFilters}[base]`);
+      if (logo) {
+        drawtextFilters.push(`[scaled]${combinedFilters}[base]`);
+      }
+      else {
+        drawtextFilters.push(`[scaled]${combinedFilters}`);
+      }
     } else {
       if (logo) {
         drawtextFilters.push(`[1:v]scale=200:200[logo];[scaled][logo]overlay=W-w-10:10`);

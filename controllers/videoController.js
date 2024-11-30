@@ -203,18 +203,17 @@ function processVideoInChunks(payload, callback) {
 
     // Log for debugging
     console.log(`Batch list file for batch ${batchIndex}:`);
-    
-    console.log(logo);
-
     const batchListPathl = batchListPath.replace(/\\/g, '/');
-    const logol = logo.replace(/\\/g, '/');
     const batchVideoPathl = batchVideoPath.replace(/\\/g, '/');
+
+    //console.log(logo);
 
     const ffmpegCommand = ffmpeg()
       .input(batchListPathl)
       .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate]);
 
     if (logo) {
+      const logol = logo.replace(/\\/g, '/');
       ffmpegCommand.input(logol);
     }
 
@@ -226,6 +225,7 @@ function processVideoInChunks(payload, callback) {
 
     // Build the combined filter chain
     let combinedFilters = '';
+    let logotext = '';
     // Add filters dynamically based on options
     if (showdate === 'true') {
       const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
@@ -256,13 +256,20 @@ function processVideoInChunks(payload, callback) {
       addFilterComplex = true;
     }
 
+    let nologo = true;
     // Add combined filters to the filter_complex
-    if (combinedFilters) {
+    if (combinedFilters.trim() !== "") {
       drawtextFilters.push(`[scaled]${combinedFilters}[base]`);
+    } else {
+      if (logo) {
+        drawtextFilters.push(`[1:v]scale=200:200[logo];[scaled][logo]overlay=W-w-10:10`);
+        nologo = false;
+        addFilterComplex = true
+      }
     }
 
     // Add logo overlay if needed
-    if (logo) {
+    if (logo && nologo) {
       drawtextFilters.push(`[1:v]scale=200:200[logo];[base][logo]overlay=W-w-10:10`);
       addFilterComplex = true;
     }

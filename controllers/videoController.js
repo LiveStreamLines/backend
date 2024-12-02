@@ -296,7 +296,7 @@ function processVideoInChunks(payload, callback) {
     
 
     const ffmpegCommand = ffmpeg()
-      .input(batchListPathl)
+      .input(batchListPath)
       .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate]);
 
     if (logo) {
@@ -381,7 +381,7 @@ function processVideoInChunks(payload, callback) {
         '-crf 18',
         '-pix_fmt yuv420p',
       ])
-      .output(batchVideoPathl)
+      .output(batchVideoPath)
       .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}: ${command}`))
       .on('end', () => {
         console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);

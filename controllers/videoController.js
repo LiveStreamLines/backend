@@ -484,7 +484,7 @@ function getAllPhotoRequest(req, res) {
   const photoRequests = photoRequestData.getAllItems();
   res.json(photoRequests.map((request) => ({
     ...request,
-    zipPath: request.status === 'ready' ? `/videos/${request.id}.zip` : null,
+    zipPath: request.status === 'ready' ? `/videos/photos_${request.id}.zip` : null,
   })));
 }
 

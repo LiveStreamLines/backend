@@ -12,7 +12,7 @@ const upload = multer({ dest: process.env.MEDIA_PATH + '/upload/' }); // You can
 router.post('/videoGen', upload.single('logo') ,videoController.generateVideoRequest);
 router.post('/photoGen', upload.single('logo'),videoController.generatePhotoRequest);
 router.get('/videoRequest',videoController.getAllVideoRequest);
-router.get('/videoRequest',videoController.getAllPhotoRequest);
+router.get('/photoRequest',videoController.getAllPhotoRequest);
 
 
 module.exports = router;

@@ -80,6 +80,7 @@ function generateVideoRequest(req, res) {
     }
 
     const logEntry = {
+      type: "video",
       developerTag: developerId,
       projectTag: projectId,
       developer: developerName,

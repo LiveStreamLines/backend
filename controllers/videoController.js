@@ -17,20 +17,15 @@ function generateCustomId() {
   return Array.from(Array(24), () => Math.floor(Math.random() * 16).toString(16)).join('');
 }
 
-function filterPics(req, res) {
-  const { developerId, projectId, cameraId, 
-    date1, date2, hour1, hour2,
-    duration, showdate = false, showedText = '', showedWatermark = '', resolution = '720'
-  } = req.body;
-
- const logo = req.file ? req.file.path : null;
-
-
+function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, hour2 })
+{
   const developer = developerData.getDeveloperByTag(developerId);
   const project = projectData.getProjectByTag(projectId);
 
   const developerName = developer[0].developerName;
   const projectName = project[0].projectName;
+
+
   // Define the camera folder path
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
   const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
@@ -56,17 +51,30 @@ function filterPics(req, res) {
     return res.status(404).json({ error: 'No pictures found for the specified date and hour range' });
   }
 
-  let finalFrameRate = 25;
-  if (duration) {
-     finalFrameRate = Math.ceil(numFilteredPics / duration);
-  }
-
-  // Create a text file with paths to the filtered images
+   // Create a text file with paths to the filtered images
   const uniqueId = generateCustomId();
   const listFileName = `image_list_${uniqueId}.txt`;
   const listFilePath = path.join(videoFolderPath, listFileName);
   const fileListContent = filteredFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
   fs.writeFileSync(listFilePath, fileListContent);
+
+  return {uniqueId, listFileName, numFilteredPics, developerName, projectName};
+}
+
+function filterPics(req, res) {
+  const { developerId, projectId, cameraId, 
+    date1, date2, hour1, hour2,
+    duration, showdate = false, showedText = '', showedWatermark = '', resolution = '720'
+  } = req.body;
+
+  const {uniqueId, listFileName, numFilteredPics, developerName, projectName} = filterImage({ developerId, projectId, cameraId, date1, date2, hour1, hour2 });
+
+  const logo = req.file ? req.file.path : null;
+ 
+  let finalFrameRate = 25;
+  if (duration) {
+     finalFrameRate = Math.ceil(numFilteredPics / duration);
+  }
 
   // Log the request
   const logEntry = {
@@ -79,6 +87,8 @@ function filterPics(req, res) {
     "endDate": date2,
     "startHour": hour1,
     "endHour": hour2,
+    "id": uniqueId,
+    "listFile" : listFileName,
     "RequestTime": new Date().toISOString(),
     "filteredImageCount": numFilteredPics,
     "frameRate": finalFrameRate,
@@ -87,8 +97,6 @@ function filterPics(req, res) {
     showedText,
     showedWatermark,
     logo: logo,
-    "id": uniqueId,
-    "listFile" : listFileName,
     "status": "queued"
   };
   const newRequest = logEntry;
@@ -98,8 +106,6 @@ function filterPics(req, res) {
   // Respond with filtered image count and the list file path
   res.json({
     message: 'Pictures filtered successfully',
-    framerate: finalFrameRate,
-    requestId: uniqueId,
     filteredImageCount: numFilteredPics
   });
 }

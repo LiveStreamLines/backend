@@ -56,8 +56,9 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   const uniqueId = generateCustomId();
   const listFileName = `image_list_${uniqueId}.txt`;
   const listFilePath = path.join(videoFolderPath, listFileName);
-  const fileListContent = filteredFiles.map(file => `file '${path.join(cameraPath, file)}'`).join('\n');
-  fs.writeFileSync(listFilePath, fileListContent);
+  const fileListContent = filteredFiles
+  .map(file => `file '${path.join(PicsPath, file).replace(/\\/g, '/')}'`)
+  .join('\n');  fs.writeFileSync(listFilePath, fileListContent);
 
   return {uniqueId, listFileName, numFilteredPics, developerName, projectName};
 }
@@ -129,6 +130,7 @@ function generatePhotoRequest(req, res) {
     }
 
     const logEntry = {
+      type: "photo",
       developerTag: developerId,
       projectTag: projectId,
       developer: developerName,
@@ -278,11 +280,8 @@ function processVideoInChunks(payload, callback) {
     fs.writeFileSync(batchListPath, fileListContent);
 
     // Log for debugging
-    console.log(`Batch list file for batch ${batchIndex}:`);
     const batchListPathl = batchListPath.replace(/\\/g, '/');
     const batchVideoPathl = batchVideoPath.replace(/\\/g, '/');
-
-    //console.log(logo);
 
     const resolutionMap = {
       '720': { width: 1280, height: 720 },
@@ -296,7 +295,7 @@ function processVideoInChunks(payload, callback) {
     
 
     const ffmpegCommand = ffmpeg()
-      .input(batchListPath)
+      .input(batchListPathl)
       .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate]);
 
     if (logo) {
@@ -381,7 +380,7 @@ function processVideoInChunks(payload, callback) {
         '-crf 18',
         '-pix_fmt yuv420p',
       ])
-      .output(batchVideoPath)
+      .output(batchVideoPathl)
       .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}: ${command}`))
       .on('end', () => {
         console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);
@@ -420,6 +419,46 @@ function concatenateVideos(videoPaths, outputVideoPath, callback) {
     .run();
 }
 
+function processPhotoRequest(queuedRequest) {
+  const { developerTag, projectTag, camera, id: requestId, listFile } = queuedRequest;
+
+  const listFilePath = path.join(mediaRoot, developerTag, projectTag, camera, 'videos', listFile);
+  const zipFilePath = path.join(mediaRoot, developerTag, projectTag, camera,'videos',`photos_${requestId}.zip`);
+
+  const output = fs.createWriteStream(zipFilePath);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+
+  archive.on('error', (err) => {
+    console.error(`Error creating ZIP for request ID: ${requestId}`, err);
+    photoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
+    processing = false;
+    processQueue();
+  });
+
+  output.on('close', () => {
+    console.log(`Photo ZIP created for request ID: ${requestId}, size: ${archive.pointer()} bytes`);
+    photoRequestData.updateItem(queuedRequest._id, { status: 'ready', zipPath: zipFilePath });
+    processing = false;
+    processQueue();
+  });
+
+  archive.pipe(output);
+
+  const filePaths = fs.readFileSync(listFilePath, 'utf-8')
+    .split('\n')
+    .map((line) => line.replace(/^file\s+'(.+)'$/, '$1').trim())
+    .filter(Boolean);
+
+  filePaths.forEach((filePath) => {
+    if (fs.existsSync(filePath)) {
+      archive.file(filePath, { name: path.basename(filePath) });
+    } else {
+      console.warn(`File not found: ${filePath}`);
+    }
+  });
+
+  archive.finalize();
+}
 
 // Controller for getting all developers
 function getAllVideoRequest(req, res) {

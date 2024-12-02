@@ -32,7 +32,7 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   const videoFolderPath = path.join(cameraPath, 'videos');
 
   // Check if the camera directory exists
-  if (!fs.existsSync(PicsPathPath)) {
+  if (!fs.existsSync(PicsPath)) {
     return res.status(404).json({ error: 'Camera directory not found' });
   }
 

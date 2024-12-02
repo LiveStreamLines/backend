@@ -2,8 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const os = require('os');
-const AdmZip = require('adm-zip');
-const { exec } = require('child_process');
+const archiver = require('archiver');
 const videoRequestData = require('../data/videoRequestData');
 const photoRequestData = require('../data/photoRequestData');
 const developerData = require('../data/developerData');
@@ -27,16 +26,18 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   const projectName = project[0].projectName;
 
   // Define the camera folder path
-  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
-  const videoFolderPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
+
+  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId);
+  const PicsPath = path.join(cameraPath, 'large');
+  const videoFolderPath = path.join(cameraPath, 'videos');
 
   // Check if the camera directory exists
-  if (!fs.existsSync(cameraPath)) {
+  if (!fs.existsSync(PicsPathPath)) {
     return res.status(404).json({ error: 'Camera directory not found' });
   }
 
   // Read all image files in the camera directory
-  const allFiles = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
+  const allFiles = fs.readdirSync(PicsPath).filter(file => file.endsWith('.jpg'));
 
   // Filter files based on date and hour range
   const filteredFiles = allFiles.filter(file => {
@@ -69,14 +70,7 @@ function generateVideoRequest(req, res) {
 
   try {
     const { uniqueId, listFileName, numFilteredPics, developerName, projectName } = filterImage({
-      developerId,
-      projectId,
-      cameraId,
-      date1,
-      date2,
-      hour1,
-      hour2,
-    });
+      developerId, projectId, cameraId, date1, date2, hour1, hour2 });
 
     const logo = req.file ? req.file.path : null;
 
@@ -133,48 +127,66 @@ function generatePhotoRequest(req, res) {
       return res.status(404).json({ error: 'No pictures found for the specified filters' });
     }
 
-    const listFilePath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos', listFileName);
-    const outputZipPath = path.join(mediaRoot, developerId, projectId, cameraId, `photos_${uniqueId}.zip`);
-    if (!fs.existsSync(listFilePath)) {
-      return res.status(404).json({ error: 'List file not found' });
-    }
+    const logEntry = {
+      developerTag: developerId,
+      projectTag: projectId,
+      developer: developerName,
+      project: projectName,
+      camera: cameraId,
+      startDate: date1,
+      endDate: date2,
+      startHour: hour1,
+      endHour: hour2,
+      id: uniqueId,
+      listFile: listFileName,
+      RequestTime: new Date().toISOString(),
+      filteredImageCount: numFilteredPics,
+      status: 'queued',
+    };
 
-    const zipCommand = `zip ${outputZipPath} -@ < ${listFilePath}`;
-    exec(zipCommand, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Error creating ZIP:', error);
-        return res.status(500).json({ error: 'Failed to create ZIP file' });
-      }
-
-      console.log('ZIP creation stdout:', stdout);
-      console.error('ZIP creation stderr:', stderr);
-      res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="${path.basename(outputZipPath)}"`);
-      res.sendFile(outputZipPath, (err) => {
-        if (err) {
-          console.error('Error sending ZIP file:', err);
-        } else {
-          console.log('ZIP file sent successfully.');
-        }
-      });
+    photoRequestData.addItem(logEntry);
+    processQueue();
+    res.json({
+      message: 'Photo request generated successfully',
+      filteredImageCount: numFilteredPics,
     });
   } catch (error) {
-    console.error('Error generating photo ZIP:', error);
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
-
 }
 
 function processQueue() {
   if (processing) return; // Skip if already processing another request
 
-  // Get the next queued request
-  const queuedRequest = videoRequestData.getAllItems().find((request) => request.status === 'queued');
+  // Fetch queued requests from both video and photo request data
+  const videoQueue = videoRequestData.getAllItems().find((request) => request.status === 'queued');
+  const photoQueue = photoRequestData.getAllItems().find((request) => request.status === 'queued');
+
+  // Determine the next request to process
+  const queuedRequest = videoQueue || photoQueue;
+
   if (!queuedRequest) {
     console.log('No queued requests found.');
     return; // No queued requests
   }
 
+  // Mark as processing
+  processing = true;
+
+  // Process the queued request based on its type
+  if (queuedRequest.type === 'video') {
+    processVideoRequest(queuedRequest);
+  } else if (queuedRequest.type === 'photo') {
+    processPhotoRequest(queuedRequest);
+  } else {
+    console.error(`Unknown request type: ${queuedRequest.type}`);
+    processing = false;
+  }
+
+}
+
+function processVideoRequest(queuedRequest) {
   // Update the status to starting
   console.log(`Starting video generation for request ID: ${queuedRequest._id}`);
   queuedRequest.status = 'starting';
@@ -184,8 +196,8 @@ function processQueue() {
 
   // Invoke generateVideoFromList
   const { developerTag, projectTag, camera, id: requestId, filteredImageCount, 
-          frameRate, resolution, showdate, showedText, showedWatermark, logo } = queuedRequest;
-  const requestPayload = {
+    frameRate, resolution, showdate, showedText, showedWatermark, logo } = queuedRequest;
+    const requestPayload = {
     developerId: developerTag,
     projectId: projectTag,
     cameraId: camera,
@@ -219,7 +231,9 @@ function processQueue() {
     // Process the next request in the queue
     processQueue();
   });
+
 }
+
 
 function processVideoInChunks(payload, callback) {
   const { developerId, projectId, cameraId, requestId, frameRate, resolution, showdate, showedText, showedWatermark, logo } = payload;
@@ -427,10 +441,10 @@ function getVideoRequestbyDeveloper(req, res){
 
 // Controller for getting all developers
 function getAllPhotoRequest(req, res) {
-  const videoRequests = videoRequestData.getAllItems();
-  res.json(videoRequests.map((request) => ({
+  const photoRequests = photoRequestData.getAllItems();
+  res.json(photoRequests.map((request) => ({
     ...request,
-    videoPath: request.status === 'ready' ? `/videos/${request.id}.mp4` : null,
+    zipPath: request.status === 'ready' ? `/videos/${request.id}.zip` : null,
   })));
 }
 

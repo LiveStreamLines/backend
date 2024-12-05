@@ -67,7 +67,7 @@ function generateVideoRequest(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
     duration, showdate = false, showedText = '', 
-    resolution = '720', music = 'false'
+    resolution = '720', music = 'false', contrast = '1.0', brightness = '0.0', saturation = '1.0'
   } = req.body;
 
   try {
@@ -104,6 +104,7 @@ function generateVideoRequest(req, res) {
       showedWatermark,
       logo,
       music,
+      contrast, brightness, saturation,
       status: 'queued',
     };
 
@@ -202,7 +203,9 @@ function processVideoRequest(queuedRequest) {
 
   // Invoke generateVideoFromList
   const { developerTag, projectTag, camera, id: requestId, filteredImageCount, 
-    frameRate, resolution, showdate, showedText, showedWatermark, logo, music } = queuedRequest;
+    frameRate, resolution, showdate, showedText, showedWatermark, logo, music,
+    contrast, brightness, saturation} = queuedRequest;
+
     const requestPayload = {
     developerId: developerTag,
     projectId: projectTag,
@@ -215,7 +218,8 @@ function processVideoRequest(queuedRequest) {
     showedText,
     showedWatermark,
     logo,
-    music
+    music,
+    contrast, brightness, saturation
   };
 
   processVideoInChunks(requestPayload, (error, videoDetails) => {
@@ -242,7 +246,10 @@ function processVideoRequest(queuedRequest) {
 }
 
 function processVideoInChunks(payload, callback) {
-  const { developerId, projectId, cameraId, requestId, frameRate, resolution, showdate, showedText, showedWatermark, logo, music } = payload;
+  const { developerId, projectId, cameraId, requestId, frameRate, 
+    resolution, showdate, showedText, showedWatermark, logo, music,
+    contrast, brightness, saturation,
+  } = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
@@ -267,7 +274,7 @@ function processVideoInChunks(payload, callback) {
     if (batchIndex >= batchCount) {
       fs.unlinkSync(listFilePath);
       fs.unlinkSync(logo);
-      concatenateVideos(partialVideos, outputVideoPath, music, callback);
+      concatenateVideos(partialVideos, outputVideoPath, music, contrast, brightness, saturation, callback);
       return;
     }
 
@@ -375,7 +382,7 @@ function processVideoInChunks(payload, callback) {
 }
 
 
-function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, callback) {
+function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, contrast, brightness, saturation, callback) {
   const concatListPath = path.join(path.dirname(outputVideoPath), `concat_list.txt`);
   const tempConcatenatedVideoPath = outputVideoPath.replace('.mp4', '_no_audio.mp4');
   const concatContent = videoPaths.map(video => `file '${video}'`).join('\n');
@@ -391,52 +398,47 @@ function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, call
       videoPaths.forEach(video => fs.unlinkSync(video)); // Clean up partial videos
       fs.unlinkSync(concatListPath); // Remove temporary list file
 
+      // Step 2: Add visual effects and background music (if applicable)
+      const backgroundMusicPath = path
+        .join(process.env.MEDIA_PATH, '/music/back.mp3')
+        .replace(/\\/g, '/'); 
 
-      // Step 2: Add background music if the flag is true
+      const ffmpegCommand = ffmpeg()
+        .input(tempConcatenatedVideoPath); // Concatenated video input
+
+      // Add background music if enabled
       if (useBackgroundMusic === 'true') {
-        const backgroundMusicPath = path
-                .join(process.env.MEDIA_PATH, '/music/back.mp3')
-                .replace(/\\/g, '/'); 
-        // Determine the video duration to match the music
-        ffmpeg.ffprobe(tempConcatenatedVideoPath, (err, metadata) => {
-          if (err) {
-            console.error('Error reading video metadata:', err);
-            callback(err, null);
-            return;
-          }
-
-          const videoDuration = metadata.format.duration;
-       
-          // Use FFmpeg to loop the music to match the video's duration
-          ffmpeg()
-           // .inputOptions([`-stream_loop -1`]) // Correctly apply stream_loop as input option
-            .input(backgroundMusicPath)
-            .input(tempConcatenatedVideoPath)
-            .outputOptions([
-              '-c:v copy', // Copy video stream
-              '-c:a aac',  // Encode audio to AAC
-              '-b:a 192k', // Set audio bitrate
-              '-shortest' // Ensure the output duration matches the video
-            ])
-            .output(outputVideoPath)
-            .on('start', command => {
-              console.log('FFmpeg command:'); // Log command for debugging
-            })
-            .on('end', () => {
-              fs.unlinkSync(tempConcatenatedVideoPath); // Clean up temporary video file
-              callback(null, { videoPath: outputVideoPath });
-            })
-            .on('error', err => {
-              console.error('Error adding music:', err);
-              callback(err, null);
-            })
-            .run();
-        });
-      } else {
-        // No music, rename concatenated file to final output
-        fs.renameSync(tempConcatenatedVideoPath, outputVideoPath);
-        callback(null, { videoPath: outputVideoPath });
+        ffmpegCommand.input(backgroundMusicPath);
       }
+
+      // Apply visual effects
+      const visualEffects = `eq=contrast=${contrast}:brightness=${brightness}:saturation=${saturation}`;
+      const filterComplex = `[0:v]${visualEffects}[video]`;
+
+      
+      ffmpegCommand
+        .complexFilter(filterComplex)
+        .map('[video]')
+        .outputOptions([
+          '-c:v libx264', // Re-encode video with effects
+          '-preset slow',
+          '-crf 18',
+          '-pix_fmt yuv420p',
+          ...(useBackgroundMusic === 'true' ? ['-map 1:a', '-shortest'] : [])
+        ])
+        .output(outputVideoPath)
+        .on('start', command => {
+          console.log('FFmpeg command:', command); // Log command for debugging
+        })
+        .on('end', () => {
+          fs.unlinkSync(tempConcatenatedVideoPath); // Clean up temporary video file
+          callback(null, { videoPath: outputVideoPath });
+        })
+        .on('error', err => {
+          console.error('Error adding effects/music:', err);
+          callback(err, null);
+        })
+        .run();
     })
     .on('error', err => {
       console.error('Error concatenating videos:', err);

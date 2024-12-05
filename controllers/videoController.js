@@ -273,7 +273,12 @@ function processVideoInChunks(payload, callback) {
     
     if (batchIndex >= batchCount) {
       fs.unlinkSync(listFilePath);
-      fs.unlinkSync(logo);
+      if (logo) {
+        fs.unlinkSync(logo);
+      }
+      if (showedWatermark) {
+        fs.unlinkSync(showedWatermark);
+      }
       concatenateVideos(partialVideos, outputVideoPath, music, contrast, brightness, saturation, callback);
       return;
     }
@@ -351,6 +356,11 @@ function processVideoInChunks(payload, callback) {
       
       drawtextFilters.push(`[${baseLabel}]${combinedTextFilters}`);
       baseLabel = 'final';
+    }
+
+    if (drawtextFilters.length === 1) {
+       const dot = `[scaled]drawtext=text='.':x=10:y=10`;
+       drawtextFilters.push(dot);
     }
     
     ffmpegCommand.addOption('-filter_complex', drawtextFilters.join(';'));

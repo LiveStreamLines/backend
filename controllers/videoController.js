@@ -67,15 +67,16 @@ function generateVideoRequest(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
     duration, showdate = false, showedText = '', 
-    showedWatermark = '', resolution = '720', music = 'false'
+    resolution = '720', music = 'false'
   } = req.body;
 
   try {
     const { uniqueId, listFileName, numFilteredPics, developerName, projectName } = filterImage({
       developerId, projectId, cameraId, date1, date2, hour1, hour2 });
 
-    const logo = req.file ? req.file.path : null;
-
+      const logo = req.files?.logo ? req.files.logo[0].path : null;
+      const showedWatermark = req.files?.showedWatermark ? req.files.showedWatermark[0].path : null;
+  
     let finalFrameRate = 25;
     if (duration) {
       finalFrameRate = Math.ceil(numFilteredPics / duration);
@@ -240,7 +241,6 @@ function processVideoRequest(queuedRequest) {
 
 }
 
-
 function processVideoInChunks(payload, callback) {
   const { developerId, projectId, cameraId, requestId, frameRate, resolution, showdate, showedText, showedWatermark, logo, music } = payload;
 
@@ -263,6 +263,7 @@ function processVideoInChunks(payload, callback) {
   const batchCount = Math.ceil(filteredFiles.length / batchSize);
 
   const processBatch = (batchIndex) => {
+    
     if (batchIndex >= batchCount) {
       fs.unlinkSync(listFilePath);
       fs.unlinkSync(logo);
@@ -287,6 +288,8 @@ function processVideoInChunks(payload, callback) {
     // Log for debugging
     const batchListPathl = batchListPath.replace(/\\/g, '/');
     const batchVideoPathl = batchVideoPath.replace(/\\/g, '/');
+    const logopath = logo ? logo.replace(/\\/g, '/') : '';
+    const watermarkpath = showedWatermark ? showedWatermark.replace(/\\/g, '/') : '';
 
     const resolutionMap = {
       '720': { width: 1280, height: 720 },
@@ -295,86 +298,55 @@ function processVideoInChunks(payload, callback) {
     };
     
     const selectedResolution = resolutionMap[resolution] || resolutionMap['HD']; // Default to HD if not specified
-    const resolutionWidth = selectedResolution.width;
-    const resolutionHeight = selectedResolution.height;
     
-
     const ffmpegCommand = ffmpeg()
       .input(batchListPathl)
       .inputOptions(['-f concat', '-safe 0', '-r ' + frameRate]);
 
-    if (logo) {
-      const logol = logo.replace(/\\/g, '/');
-      ffmpegCommand.input(logol);
-    }
-
-    let addFilterComplex = false; // Track if we need to add -filter_complex
     const drawtextFilters = [];
+    let inputIndex = 0;
+    
+    const resolutionFilter = `[0:v]scale=${selectedResolution.width}:${selectedResolution.height}[scaled]`;
+    drawtextFilters.push(resolutionFilter);
+    let baseLabel = 'scaled';
 
-    // Ensure the input video dimensions are divisible by 2
-    drawtextFilters.push(`[0:v]scale=${resolutionWidth}:${resolutionHeight}[scaled]`);
-
-    // Build the combined filter chain
-    let combinedFilters = '';
-    let logotext = '';
-    // Add filters dynamically based on options
-    if (showdate === 'true') {
-      //const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
-      const filterScriptContent = batchFiles.map((file, index) => {
-        const fileName = path.basename(file);
-        const fileDate = fileName.substring(0, 8);
-        const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
-        return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
-      }).join(',');
-      
-
-      // filterScriptPathl = filterScriptPath.replace(/\\/g, '/');
-      //fs.writeFileSync(filterScriptPath, filterScriptContent);
-      //combinedFilters += `drawtext=textfile='${filterScriptPathl}'`;
-      combinedFilters += `${filterScriptContent}`;
-      addFilterComplex = true;
-    }
-
-    if (showedText) {
-      if (combinedFilters) combinedFilters += ',';
-      combinedFilters += `drawtext=text='${showedText}':x=(w-text_w)/2:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5`;
-      addFilterComplex = true;
+    if (logo) {
+      ffmpegCommand.input(logopath); // Add logo as an input
+      drawtextFilters.push(`[${++inputIndex}:v]scale=200:-1[logo]`);
+      drawtextFilters.push(`[${baseLabel}][logo]overlay=W-w-10:10[with_logo]`);
+      baseLabel = 'with_logo';
     }
 
     if (showedWatermark) {
-      if (combinedFilters) combinedFilters += ',';
-      combinedFilters += `drawtext=text='${showedWatermark}':x=w/2-text_w/2:y=h/2-text_h/2:fontsize=120:fontcolor=white:alpha=0.3:borderw=2:bordercolor=black`;
-      addFilterComplex = true;
+      ffmpegCommand.input(watermarkpath); // Add watermark as an input
+      drawtextFilters.push(`[${++inputIndex}:v]format=rgba,colorchannelmixer=aa=0.2[watermark]`);
+      drawtextFilters.push(`[${baseLabel}][watermark]overlay=W/2-w/2:H/2-h/2[with_watermark]`);
+      baseLabel = 'with_watermark';
     }
+   
+    if (showdate === 'true' || showedText) {
+      let combinedTextFilters = '';
 
-    let nologo = true;
-    // Add combined filters to the filter_complex
-    if (combinedFilters.trim() !== "") {
-      if (logo) {
-        drawtextFilters.push(`[scaled]${combinedFilters}[base]`);
+      if (showdate === 'true') {
+        const filterScriptContent = batchFiles.map((file, index) => {
+          const fileName = path.basename(file);
+          const fileDate = fileName.substring(0, 8);
+          const formattedDate = `${fileDate.substring(0, 4)}-${fileDate.substring(4, 6)}-${fileDate.substring(6, 8)}`;
+          return `drawtext=text='${formattedDate}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
+        }).join(',');
+        combinedTextFilters += `${filterScriptContent}`;
       }
-      else {
-        drawtextFilters.push(`[scaled]${combinedFilters}`);
-      }
-    } else {
-      if (logo) {
-        drawtextFilters.push(`[1:v]scale=200:200[logo];[scaled][logo]overlay=W-w-10:10`);
-        nologo = false;
-        addFilterComplex = true
-      }
-    }
 
-    // Add logo overlay if needed
-    if (logo && nologo) {
-      drawtextFilters.push(`[1:v]scale=200:200[logo];[base][logo]overlay=W-w-10:10`);
-      addFilterComplex = true;
+      if (showedText) {
+        if (combinedTextFilters) combinedTextFilters += ',';
+        combinedTextFilters += `drawtext=text='${showedText}':x=(w-text_w)/2:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5`;
+      }
+      
+      drawtextFilters.push(`[${baseLabel}]${combinedTextFilters}`);
+      baseLabel = 'final';
     }
-
-    // Apply the filter_complex if filters are added
-    if (addFilterComplex) {
-      const filterComplexString = `${drawtextFilters.join(';')}`;
-      ffmpegCommand.addOption('-filter_complex', filterComplexString);
-    }
+    
+    ffmpegCommand.addOption('-filter_complex', drawtextFilters.join(';'));
 
     // Add output options
     ffmpegCommand
@@ -386,7 +358,7 @@ function processVideoInChunks(payload, callback) {
         '-pix_fmt yuv420p',
       ])
       .output(batchVideoPathl)
-      .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}`))
+      .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}:${command}`))
       .on('end', () => {
         console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);
         fs.unlinkSync(batchListPathl);

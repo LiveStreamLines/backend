@@ -9,8 +9,11 @@ const upload = multer({ dest: process.env.MEDIA_PATH + '/upload/' }); // You can
 
 // Define route to generate a video from selected pictures
 //router.post('/', videoController.generateVideo);
-router.post('/videoGen', upload.single('logo') ,videoController.generateVideoRequest);
-router.post('/photoGen', upload.single('logo'),videoController.generatePhotoRequest);
+router.post('/videoGen', upload.fields([
+    { name: 'logo', maxCount: 1 }, // Expecting one file for logo
+    { name: 'showedWatermark', maxCount: 1 } // Expecting one file for watermark
+  ]) ,videoController.generateVideoRequest);
+router.post('/photoGen', videoController.generatePhotoRequest);
 router.get('/videoRequest',videoController.getAllVideoRequest);
 router.get('/photoRequest',videoController.getAllPhotoRequest);
 

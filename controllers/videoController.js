@@ -66,7 +66,8 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
 function generateVideoRequest(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
-    duration, showdate = false, showedText = '', showedWatermark = '', resolution = '720'
+    duration, showdate = false, showedText = '', 
+    showedWatermark = '', resolution = '720', music = 'false'
   } = req.body;
 
   try {
@@ -101,6 +102,7 @@ function generateVideoRequest(req, res) {
       showedText,
       showedWatermark,
       logo,
+      music,
       status: 'queued',
     };
 
@@ -199,7 +201,7 @@ function processVideoRequest(queuedRequest) {
 
   // Invoke generateVideoFromList
   const { developerTag, projectTag, camera, id: requestId, filteredImageCount, 
-    frameRate, resolution, showdate, showedText, showedWatermark, logo } = queuedRequest;
+    frameRate, resolution, showdate, showedText, showedWatermark, logo, music } = queuedRequest;
     const requestPayload = {
     developerId: developerTag,
     projectId: projectTag,
@@ -211,7 +213,8 @@ function processVideoRequest(queuedRequest) {
     showdate,
     showedText,
     showedWatermark,
-    logo
+    logo,
+    music
   };
 
   processVideoInChunks(requestPayload, (error, videoDetails) => {
@@ -239,7 +242,7 @@ function processVideoRequest(queuedRequest) {
 
 
 function processVideoInChunks(payload, callback) {
-  const { developerId, projectId, cameraId, requestId, frameRate, resolution, showdate, showedText, showedWatermark, logo } = payload;
+  const { developerId, projectId, cameraId, requestId, frameRate, resolution, showdate, showedText, showedWatermark, logo, music } = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
   const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
@@ -261,7 +264,9 @@ function processVideoInChunks(payload, callback) {
 
   const processBatch = (batchIndex) => {
     if (batchIndex >= batchCount) {
-      concatenateVideos(partialVideos, outputVideoPath, callback);
+      fs.unlinkSync(listFilePath);
+      fs.unlinkSync(logo);
+      concatenateVideos(partialVideos, outputVideoPath, music, callback);
       return;
     }
 
@@ -314,7 +319,7 @@ function processVideoInChunks(payload, callback) {
     let logotext = '';
     // Add filters dynamically based on options
     if (showdate === 'true') {
-      const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
+      //const filterScriptPath = path.join(cameraPath, `batch_filter_${requestId}_${batchIndex}.txt`);
       const filterScriptContent = batchFiles.map((file, index) => {
         const fileName = path.basename(file);
         const fileDate = fileName.substring(0, 8);
@@ -324,7 +329,7 @@ function processVideoInChunks(payload, callback) {
       
 
       // filterScriptPathl = filterScriptPath.replace(/\\/g, '/');
-      fs.writeFileSync(filterScriptPath, filterScriptContent);
+      //fs.writeFileSync(filterScriptPath, filterScriptContent);
       //combinedFilters += `drawtext=textfile='${filterScriptPathl}'`;
       combinedFilters += `${filterScriptContent}`;
       addFilterComplex = true;
@@ -381,9 +386,10 @@ function processVideoInChunks(payload, callback) {
         '-pix_fmt yuv420p',
       ])
       .output(batchVideoPathl)
-      .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}: ${command}`))
+      .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}`))
       .on('end', () => {
         console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);
+        fs.unlinkSync(batchListPathl);
         processBatch(batchIndex + 1);
       })
       .on('error', err => {
@@ -397,20 +403,68 @@ function processVideoInChunks(payload, callback) {
 }
 
 
-function concatenateVideos(videoPaths, outputVideoPath, callback) {
+function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, callback) {
   const concatListPath = path.join(path.dirname(outputVideoPath), `concat_list.txt`);
+  const tempConcatenatedVideoPath = outputVideoPath.replace('.mp4', '_no_audio.mp4');
   const concatContent = videoPaths.map(video => `file '${video}'`).join('\n');
   fs.writeFileSync(concatListPath, concatContent);
 
+  // Step 1: Concatenate videos without re-encoding
   ffmpeg()
     .input(concatListPath)
     .inputOptions(['-f concat', '-safe 0'])
     .outputOptions(['-c copy'])
-    .output(outputVideoPath)
+    .output(tempConcatenatedVideoPath)
     .on('end', () => {
-      videoPaths.forEach(video => fs.unlinkSync(video));
-      fs.unlinkSync(concatListPath);
-      callback(null, { videoPath: outputVideoPath });
+      videoPaths.forEach(video => fs.unlinkSync(video)); // Clean up partial videos
+      fs.unlinkSync(concatListPath); // Remove temporary list file
+
+
+      // Step 2: Add background music if the flag is true
+      if (useBackgroundMusic === 'true') {
+        const backgroundMusicPath = path
+                .join(process.env.MEDIA_PATH, '/music/back.mp3')
+                .replace(/\\/g, '/'); 
+        // Determine the video duration to match the music
+        ffmpeg.ffprobe(tempConcatenatedVideoPath, (err, metadata) => {
+          if (err) {
+            console.error('Error reading video metadata:', err);
+            callback(err, null);
+            return;
+          }
+
+          const videoDuration = metadata.format.duration;
+       
+          // Use FFmpeg to loop the music to match the video's duration
+          ffmpeg()
+           // .inputOptions([`-stream_loop -1`]) // Correctly apply stream_loop as input option
+            .input(backgroundMusicPath)
+            .input(tempConcatenatedVideoPath)
+            .outputOptions([
+              '-c:v copy', // Copy video stream
+              '-c:a aac',  // Encode audio to AAC
+              '-b:a 192k', // Set audio bitrate
+              '-shortest' // Ensure the output duration matches the video
+            ])
+            .output(outputVideoPath)
+            .on('start', command => {
+              console.log('FFmpeg command:'); // Log command for debugging
+            })
+            .on('end', () => {
+              fs.unlinkSync(tempConcatenatedVideoPath); // Clean up temporary video file
+              callback(null, { videoPath: outputVideoPath });
+            })
+            .on('error', err => {
+              console.error('Error adding music:', err);
+              callback(err, null);
+            })
+            .run();
+        });
+      } else {
+        // No music, rename concatenated file to final output
+        fs.renameSync(tempConcatenatedVideoPath, outputVideoPath);
+        callback(null, { videoPath: outputVideoPath });
+      }
     })
     .on('error', err => {
       console.error('Error concatenating videos:', err);
@@ -418,6 +472,7 @@ function concatenateVideos(videoPaths, outputVideoPath, callback) {
     })
     .run();
 }
+
 
 function processPhotoRequest(queuedRequest) {
   const { developerTag, projectTag, camera, id: requestId, listFile } = queuedRequest;

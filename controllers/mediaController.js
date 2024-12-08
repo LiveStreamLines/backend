@@ -21,7 +21,7 @@ function handleMediaForm(req, res) {
 
     if (req.file) {
         const fileName = `${savedMedia._id}${path.extname(req.file.originalname)}`;
-        const filePath = path.join(process.env.MEDIA_PATH, 'media/files/', fileName);
+        const filePath = path.join(process.env.MEDIA_PATH, 'files/', fileName);
 
         // Move the uploaded file to the specified directory
         fs.rename(req.file.path, filePath, (err) => {
@@ -31,7 +31,7 @@ function handleMediaForm(req, res) {
             }
 
             // Update media data with the file path
-            const finalMedia = mediaData.updateItem(savedMedia._id, { file: `media/files/${fileName}` });
+            const finalMedia = mediaData.updateItem(savedMedia._id, { file: `files/${fileName}` });
             return res.status(201).json(finalMedia);
         });
     } else {

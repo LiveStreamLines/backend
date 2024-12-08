@@ -3,7 +3,7 @@ const path = require('path');
 
 class DataModel {
     constructor(modelName) {
-        this.filePath = path.join(__dirname, `${modelName}.json`);
+        this.filePath = path.join(__dirname, '../data', `${modelName}.json`);
     }
 
     // Helper function to read data from JSON file

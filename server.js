@@ -4,8 +4,6 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
-const path = require('path');
-const fs = require('fs');
 
 const logoRoutes = require('./routes/logo');
 const authRoutes = require('./routes/auth');
@@ -16,6 +14,7 @@ const userRoutes = require('./routes/users');
 const cameraPicsRoutes = require ('./routes/camerapics');
 const videoRoutes = require ('./routes/video');
 const weatherRoutes = require ('./routes/weather');
+const mediaRoutes = require ('./routes/media');
 
 
 const app = express();
@@ -36,7 +35,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/camerapics', cameraPicsRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/weather', weatherRoutes);
-
+app.use('/api/media', mediaRoutes);
 
 
 const PORT = 5000;

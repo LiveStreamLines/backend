@@ -1,5 +1,5 @@
-const projectData = require('../data/projectData');
-const developerData = require('../data/developerData'); // To validate developer selection
+const projectData = require('../models/projectData');
+const developerData = require('../models/developerData'); // To validate developer selection
 const path = require('path');
 const fs = require('fs');
 

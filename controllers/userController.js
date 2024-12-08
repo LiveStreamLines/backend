@@ -1,4 +1,4 @@
-const userData = require('../data/userData');
+const userData = require('../models/userData');
 
 // Controller for getting all Users
 function getAllUsers(req, res) {

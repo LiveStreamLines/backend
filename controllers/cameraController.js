@@ -1,4 +1,5 @@
-const cameraData = require('../data/cameraData');
+const cameraData = require('../models/cameraData');
+
 
 // Controller for getting all Cameras
 function getAllCameras(req, res) {

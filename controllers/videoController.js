@@ -3,10 +3,10 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const os = require('os');
 const archiver = require('archiver');
-const videoRequestData = require('../data/videoRequestData');
-const photoRequestData = require('../data/photoRequestData');
-const developerData = require('../data/developerData');
-const projectData = require('../data/projectData');
+const videoRequestData = require('../models/videoRequestData');
+const photoRequestData = require('../models/photoRequestData');
+const developerData = require('../models/developerData');
+const projectData = require('../models/projectData');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
 const batchSize = 200; // Number of images per batch for processing

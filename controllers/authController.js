@@ -1,6 +1,6 @@
 // controllers/authController.js
 const jwt = require('jsonwebtoken');
-const userData = require('../data/userData'); // Import usersData here
+const userData = require('../models/userData'); // Import usersData here
 
 
 function login(req, res) {

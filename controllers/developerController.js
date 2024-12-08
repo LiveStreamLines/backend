@@ -1,4 +1,4 @@
-const developerData = require('../data/developerData');
+const developerData = require('../models/developerData');
 const path = require('path');
 const fs = require('fs');
 

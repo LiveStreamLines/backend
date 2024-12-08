@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const mediaData = require('../data/mediaData'); // Assuming a similar structure like developerData.js
+const mediaData = require('../models/mediaData'); // Assuming a similar structure like developerData.js
 
 // Controller for handling media form submissions
 function handleMediaForm(req, res) {

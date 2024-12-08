@@ -18,6 +18,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Route for handling media form submission
-router.post('/', upload.single('file'), mediaController.handleMediaForm);
+router.post('/', upload.array('files'), mediaController.handleMediaForm);
 
 module.exports = router;

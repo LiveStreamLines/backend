@@ -16,19 +16,21 @@ function login(req, res) {
       // Create a JWT token with user information
       const authToken = jwt.sign(
         { email: user.email, role: user.role },
-        'secretKey', 
-        { expiresIn: '1h' }
+        'secretKey'
       );
   
       // Extract IDs for authorized developers and projects from the user object
-      const developerIds = user.developers || [];
-      const projectIds = user.Projects || []; // Adjust case to match data
+      const developerIds = user.accessibleDevelopers || [];
+      const projectIds = user.accessibleProjects || []; 
+      const cameraIds = user.accessibleCameras || []; 
+      
   
       res.json({ 
         authh: authToken, 
-        projects: projectIds, 
+        role: user.role,
         developers: developerIds,
-        role: user.role
+        projects: projectIds, 
+        cameras: cameraIds        
       });
     } else {
       res.status(401).json({ msg: 'Invalid credentials' });

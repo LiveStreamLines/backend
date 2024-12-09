@@ -23,6 +23,7 @@ function login(req, res) {
       const developerIds = user.accessibleDevelopers || [];
       const projectIds = user.accessibleProjects || []; 
       const cameraIds = user.accessibleCameras || []; 
+      const services = user.accessibleServices || [];
       
   
       res.json({ 
@@ -30,7 +31,8 @@ function login(req, res) {
         role: user.role,
         developers: developerIds,
         projects: projectIds, 
-        cameras: cameraIds        
+        cameras: cameraIds,
+        services: services     
       });
     } else {
       res.status(401).json({ msg: 'Invalid credentials' });

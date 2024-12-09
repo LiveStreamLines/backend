@@ -67,7 +67,7 @@ function updateDeveloper(req, res) {
 
 // Controller for deleting a developer
 function deleteDeveloper(req, res) {
-    const isDeleted = developerData.deleteItem(req.params._id);
+    const isDeleted = developerData.deleteItem(req.params.id);
     if (isDeleted) {
         res.status(204).send();
     } else {

@@ -88,7 +88,7 @@ function updateProject(req, res) {
 
 // Controller for deleting a Project
 function deleteProject(req, res) {
-    const isDeleted = projectData.deleteItem(req.params._id);
+    const isDeleted = projectData.deleteItem(req.params.id);
     if (isDeleted) {
         res.status(204).send();
     } else {

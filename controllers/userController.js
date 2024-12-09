@@ -36,7 +36,7 @@ function updateUser(req, res) {
 
 // Controller for deleting a User
 function deleteUser(req, res) {
-    const isDeleted = userData.deleteItem(req.params._id);
+    const isDeleted = userData.deleteItem(req.params.id);
     if (isDeleted) {
         res.status(204).send();
     } else {

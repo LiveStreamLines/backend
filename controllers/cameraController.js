@@ -47,7 +47,7 @@ function updateCamera(req, res) {
 
 // Controller for deleting a Camera
 function deleteCamera(req, res) {
-    const isDeleted = cameraData.deleteItem(req.params._id);
+    const isDeleted = cameraData.deleteItem(req.params.id);
     if (isDeleted) {
         res.status(204).send();
     } else {

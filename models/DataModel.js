@@ -92,6 +92,11 @@ class DataModel {
         return data.find(user => user.email === email && user.password === password);
     }
 
+    findUserByPhone(phone) {
+        const data = this.readData();
+        return data.find(user => user.phone === phone);
+    }
+
     getRequestByDeveloperTag(tag){
         const data = this.readData();
         return data.filter(item => item.developer === tag)

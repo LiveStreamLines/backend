@@ -15,6 +15,7 @@ const cameraPicsRoutes = require ('./routes/camerapics');
 const videoRoutes = require ('./routes/video');
 const weatherRoutes = require ('./routes/weather');
 const mediaRoutes = require ('./routes/media');
+const otpRoutes = require('./routes/otp');
 
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/api/camerapics', cameraPicsRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/otp', otpRoutes);
 
 
 const PORT = 5000;

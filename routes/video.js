@@ -13,7 +13,7 @@ router.post('/videoGen', upload.fields([
     { name: 'logo', maxCount: 1 }, // Expecting one file for logo
     { name: 'showedWatermark', maxCount: 1 } // Expecting one file for watermark
   ]) ,videoController.generateVideoRequest);
-router.post('/photoGen', videoController.generatePhotoRequest);
+router.post('/photoGen', upload.none(), videoController.generatePhotoRequest);
 router.get('/videoRequest',videoController.getAllVideoRequest);
 router.get('/photoRequest',videoController.getAllPhotoRequest);
 

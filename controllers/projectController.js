@@ -29,6 +29,16 @@ function getProjectByDeveloper(req, res) {
     }
 }
 
+// Controller for getting projects in Developer
+function getProjectByTag(req, res) {
+    const project = projectData.getProjectByTag(req.params.tag);
+    if (project) {
+        res.json(project);
+    } else {
+        res.status(404).json({ message: 'Project not found' });
+    }
+}
+
 
 // Controller for adding a new Project
 function addProject(req, res) {
@@ -100,6 +110,7 @@ module.exports = {
     getAllProjects,
     getProjectById,
     getProjectByDeveloper,
+    getProjectByTag,
     addProject,
     updateProject,
     deleteProject

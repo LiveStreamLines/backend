@@ -26,6 +26,7 @@ const storage = multer.diskStorage({
   
 router.get('/', developerController.getAllDevelopers);
 router.get('/:id', developerController.getDeveloperById);
+router.get('/:tag', developerController.getDeveloperbyTag);
 router.post('/', upload.single('logo'), developerController.addDeveloper);
 router.put('/:id', upload.single('logo'), developerController.updateDeveloper);
 router.delete('/:id', developerController.deleteDeveloper);

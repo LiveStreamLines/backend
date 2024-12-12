@@ -19,6 +19,15 @@ function getDeveloperById(req, res) {
     }
 }
 
+function getDeveloperbyTag(req, res){
+    const developer = developerData.getDeveloperByTag(req.params.tag);
+    if (developer) {
+        res.json(developer);
+    } else {
+        res.status(404).json({message : 'Developer not found' });
+    }
+}
+
 // Controller for adding a new developer
 function addDeveloper(req, res) {
     const newDeveloper = req.body;
@@ -78,6 +87,7 @@ function deleteDeveloper(req, res) {
 module.exports = {
     getAllDevelopers,
     getDeveloperById,
+    getDeveloperbyTag,
     addDeveloper,
     updateDeveloper,
     deleteDeveloper

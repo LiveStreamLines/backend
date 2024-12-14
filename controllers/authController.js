@@ -28,6 +28,8 @@ function login(req, res) {
   
       res.json({ 
         authh: authToken, 
+        username: user.username,
+        email: user.email,
         role: user.role,
         developers: developerIds,
         projects: projectIds, 

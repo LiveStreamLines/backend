@@ -28,7 +28,7 @@ function login(req, res) {
   
       res.json({ 
         authh: authToken, 
-        username: user.username,
+        username: user.name,
         email: user.email,
         role: user.role,
         developers: developerIds,

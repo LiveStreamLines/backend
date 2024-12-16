@@ -150,7 +150,7 @@ function generateWeeklyVideo(req, res) {
 
     ffmpeg()
       .input(tempInputPattern)
-      .inputOptions(['-framerate 1']) // Set frame rate (1 frame per second)
+      .inputOptions(['-framerate 2']) // Set frame rate (1 frame per second)
       .outputOptions(['-pix_fmt yuv420p']) // Ensure compatibility with most players
       .on('end', () => {
         // Clean up the temporary directory

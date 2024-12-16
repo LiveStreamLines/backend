@@ -130,14 +130,32 @@ function generateWeeklyVideo(req, res) {
   try {
     const weeklyImages = getWeeklyImages(cameraPath);
 
-    const ffmpegCommand = ffmpeg();
+    if (weeklyImages.length < 2) {
+      return res.status(400).json({ error: 'Not enough images to generate a video.' });
+    }
 
-    weeklyImages.forEach(image => {
-      ffmpegCommand.addInput(image);
+    // Ensure the images are numbered sequentially for FFmpeg
+    const tempDir = path.join(cameraPath, 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir);
+    }
+
+    // Copy images to a temporary directory with sequential names (e.g., 001.jpg, 002.jpg)
+    weeklyImages.forEach((imagePath, index) => {
+      const sequentialName = path.join(tempDir, `${String(index + 1).padStart(3, '0')}.jpg`);
+      fs.copyFileSync(imagePath, sequentialName);
     });
 
-    ffmpegCommand
+    const tempInputPattern = path.join(tempDir, '%03d.jpg'); // Sequential input pattern for FFmpeg
+
+    ffmpeg()
+      .input(tempInputPattern)
+      .inputOptions(['-framerate 1']) // Set frame rate (1 frame per second)
+      .outputOptions(['-pix_fmt yuv420p']) // Ensure compatibility with most players
       .on('end', () => {
+        // Clean up the temporary directory
+        fs.rmSync(tempDir, { recursive: true, force: true });
+
         res.json({
           message: 'Video generated successfully',
           videoPath: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/weekly_video.mp4`
@@ -145,6 +163,12 @@ function generateWeeklyVideo(req, res) {
       })
       .on('error', err => {
         console.error('Error generating video:', err);
+
+        // Clean up the temporary directory on error
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+
         res.status(500).json({ error: 'Failed to generate video' });
       })
       .save(outputPath);
@@ -152,6 +176,7 @@ function generateWeeklyVideo(req, res) {
     res.status(404).json({ error: error.message });
   }
 }
+
 
 
 module.exports = {

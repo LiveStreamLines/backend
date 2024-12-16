@@ -49,61 +49,75 @@ function getCameraPictures (req, res) {
   });
 }
 
-function getCameraPreview(req, res) {
-  const { developerId, projectId, cameraId } = req.params;
-  
-  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
-  
+// Helper function to get weekly images
+function getWeeklyImages(cameraPath) {
   if (!fs.existsSync(cameraPath)) {
-    return res.status(404).json({ error: 'Camera directory not found' });
+    throw new Error('Camera directory not found');
   }
 
   const files = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
-  
+
   if (files.length === 0) {
-    return res.status(404).json({ error: 'No pictures found in camera directory' });
+    throw new Error('No pictures found in camera directory');
   }
-  
-  // Sort files by name to ensure the oldest picture is first
+
+  // Sort files and collect weekly images
   const sortedFiles = files.sort();
   const startDate = sortedFiles[0].slice(0, 8); // Extract date from the first file
   const startDateObj = new Date(
-    startDate.slice(0, 4), // Year
-    startDate.slice(4, 6) - 1, // Month (zero-based)
-    startDate.slice(6, 8) // Day
+    startDate.slice(0, 4),
+    startDate.slice(4, 6) - 1,
+    startDate.slice(6, 8)
   );
-  
+
   const currentDate = new Date();
-  
-  // Collect one image per week starting from the start date up to today
   const weeklyImages = [];
   let currentWeekStart = startDateObj;
-  
+
   while (currentWeekStart <= currentDate) {
-    const weekStartDate = currentWeekStart.toISOString().slice(0, 10).replace(/-/g, ''); // Get YYYYMMDD for the week
+    const weekStartDate = currentWeekStart.toISOString().slice(0, 10).replace(/-/g, '');
     const weeklyFiles = sortedFiles.filter(file => {
-      const fileDateStr = file.slice(0, 8); // Extract date (YYYYMMDD)
-      const fileTimeStr = file.slice(8, 12); // Extract time (HHMM)
-      return file.startsWith(weekStartDate) && fileTimeStr.startsWith('12'); // Match any time between 12:00 and 12:59
+      const fileDateStr = file.slice(0, 8);
+      const fileTimeStr = file.slice(8, 12);
+      return file.startsWith(weekStartDate) && fileTimeStr.startsWith('12');
     });
-    
+
     if (weeklyFiles.length > 0) {
-      // Pick the first image for that week
-      weeklyImages.push(weeklyFiles[0].replace('.jpg', '')); // Add only the image name without extension
+      weeklyImages.push(path.join(cameraPath, weeklyFiles[0])); // Add the full path of the image
     }
-    
-    // Move to the next week
+
     currentWeekStart.setDate(currentWeekStart.getDate() + 7);
   }
-  
+
   if (weeklyImages.length === 0) {
-    return res.status(404).json({ error: 'No weekly images found' });
+    throw new Error('No weekly images found');
   }
 
-  res.json({
-    weeklyImages,
-    path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
-  });
+  return weeklyImages;
+}
+
+
+function getCameraPreview(req, res) {
+  const { developerId, projectId, cameraId } = req.params;  
+  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
+  
+  try {
+    const weeklyImages = getWeeklyImages(cameraPath);
+
+    // Extract image filenames (without extensions)
+    const weeklyImageNames = weeklyImages.map(imagePath => {
+      return path.basename(imagePath, '.jpg');
+    });
+
+    res.json({
+      weeklyImages: weeklyImageNames,
+      path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
+    });
+    
+  } catch (error) {
+    res.status(404).json({ error: error.message });
+  }
+  
 }
 
 module.exports = {

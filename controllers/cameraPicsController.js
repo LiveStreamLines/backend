@@ -113,14 +113,47 @@ function getCameraPreview(req, res) {
       weeklyImages: weeklyImageNames,
       path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
     });
-    
+
   } catch (error) {
     res.status(404).json({ error: error.message });
   }
   
 }
 
+function generateWeeklyVideo(req, res) {
+  const { developerId, projectId, cameraId } = req.params;
+  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
+  const outputPath = path.join(mediaRoot, developerId, projectId, cameraId, 'weekly_video.mp4');
+
+  try {
+    const weeklyImages = getWeeklyImages(cameraPath);
+
+    const ffmpegCommand = ffmpeg();
+
+    weeklyImages.forEach(image => {
+      ffmpegCommand.addInput(image);
+    });
+
+    ffmpegCommand
+      .on('end', () => {
+        res.json({
+          message: 'Video generated successfully',
+          videoPath: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/weekly_video.mp4`
+        });
+      })
+      .on('error', err => {
+        console.error('Error generating video:', err);
+        res.status(500).json({ error: 'Failed to generate video' });
+      })
+      .save(outputPath);
+  } catch (error) {
+    res.status(404).json({ error: error.message });
+  }
+}
+
+
 module.exports = {
   getCameraPreview,
+  generateWeeklyVideo,  
   getCameraPictures
 }

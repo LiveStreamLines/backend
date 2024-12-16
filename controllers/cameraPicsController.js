@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+
 
 // Define the root directory for camera pictures
 const mediaRoot = process.env.MEDIA_PATH + '/upload';

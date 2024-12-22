@@ -12,12 +12,18 @@ function login(req, res) {
       if (!user.isActive) {
         return res.status(403).json({ msg: 'User account is inactive' });
       }
+
+      // Check if phone is registered
+      if (!user.phone) {
+        return res.status(200).json({ phoneRequired: true, msg: 'Phone verification required.' });
+      }
   
       // Create a JWT token with user information
       const authToken = jwt.sign(
         { email: user.email, role: user.role },
         'secretKey'
       );
+      
   
       // Extract IDs for authorized developers and projects from the user object
       const developerIds = user.accessibleDevelopers || [];
@@ -30,6 +36,7 @@ function login(req, res) {
         authh: authToken, 
         username: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         developers: developerIds,
         projects: projectIds, 

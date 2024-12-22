@@ -12,25 +12,21 @@ exports.sendOtp = (req, res) => {
   }
 
   const user = userData.findUserByPhone(phone);
-  if (user) {
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(403).json({ msg: 'User account is inactive' });
-    }
 
-    client.verify.v2.services(process.env.TWILIO_SERVICE_SID)
-      .verifications.create({ to: phone, channel: 'sms' })
-      .then(() => {
-        res.status(200).json({ message: 'OTP sent successfully' });
-      })
-      .catch((err) => {
-        console.error('Error sending OTP:', err);
-        res.status(500).json({ error: 'Failed to send OTP' });
-      });
-  } else {
-    res.status(401).json({ msg: 'Phone not registered' });
+  if (user && !user.isActive) {
+      return res.status(403).json({ msg: 'User account is inactive' });
   }
-};
+
+  client.verify.v2.services(process.env.TWILIO_SERVICE_SID)
+    .verifications.create({ to: phone, channel: 'sms' })
+    .then(() => {
+      res.status(200).json({ message: 'OTP sent successfully' });
+    })
+    .catch((err) => {
+      console.error('Error sending OTP:', err);
+      res.status(500).json({ error: 'Failed to send OTP' });
+    });
+}
 
 // Verify OTP
 exports.verifyOtp = (req, res) => {
@@ -45,19 +41,23 @@ exports.verifyOtp = (req, res) => {
     .then((verificationCheck) => {
       if (verificationCheck.status === 'approved') {
         // Fetch the user from the database
-        const user = userData.findUserByPhone(phone);
+        let user = userData.findUserByPhone(phone);
 
-        if (user) {
-          // Check if user is active
-          if (!user.isActive) {
-            return res.status(403).json({ msg: 'User account is inactive' });
-          }
+        if (!user) {
+           // Handle new phone registration
+           user = userData.registerPhoneForUser(phone); // Add phone registration logic
+        }
 
-          // Generate a JWT token
-          const authToken = jwt.sign(
-            { phone: user.phone, role: user.role },
-            'secretKey'
-          );
+        // Check if user is active
+        if (!user.isActive) {
+          return res.status(403).json({ msg: 'User account is inactive' });
+        }
+
+        // Generate a JWT token
+        const authToken = jwt.sign(
+          { phone: user.phone, role: user.role },
+          'secretKey'
+        );
 
           // Extract IDs for authorized developers and projects from the user object
           const developerIds = user.accessibleDevelopers || [];
@@ -67,15 +67,16 @@ exports.verifyOtp = (req, res) => {
 
           return res.json({
             authh: authToken,
+            username: user.name,
+            email: user.email,
+            phone: user.phone,
             role: user.role,
             developers: developerIds,
             projects: projectIds,
             cameras: cameraIds,
             services: services
           });
-        } else {
-          return res.status(401).json({ msg: 'Phone not registered' });
-        }
+       
       } else {
         return res.status(401).json({ error: 'Invalid OTP' });
       }

@@ -43,6 +43,7 @@ class DataModel {
         const newItem = {
             _id: id,
             ...item,
+            isActive: true,
             createdDate: new Date().toISOString()
         };
         items.push(newItem);

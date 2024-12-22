@@ -41,8 +41,8 @@ function login(req, res) {
     }
 }
 
-async function resetPassword(req, res) {
-  try {
+function resetPassword(req, res) {
+ 
     const { token, newPassword } = req.body;
 
     if (!token || !newPassword) {
@@ -50,7 +50,7 @@ async function resetPassword(req, res) {
     }
 
     // Find user by token
-    const user = await userData.findUserByToken(token);
+    const user = userData.getUserByToken(token);
     if (!user) {
       return res.status(400).json({ msg: 'Invalid or expired token' });
     }
@@ -61,20 +61,22 @@ async function resetPassword(req, res) {
     }
 
     // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = newPassword;
 
     // Update the user's password and clear the token
-    await userData.updateUserById(user.id, {
+    console.log(user);
+    console.log(user[0]._id);
+
+    const updated = userData.updateItem(user[0]._id, {
       password: hashedPassword,
       resetPasswordToken: null,
       resetPasswordExpires: null,
     });
 
+    console.log(updated);
+
     res.status(200).json({ msg: 'Password reset successfully' });
-  } catch (error) {
-    console.error('Error resetting password:', error);
-    res.status(500).json({ msg: 'An error occurred. Please try again.' });
-  }
+  
 }
 
 module.exports = {

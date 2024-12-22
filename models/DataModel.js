@@ -112,6 +112,11 @@ class DataModel {
         return data.filter(item => item.projectTag === tag);
     }
 
+    getUserByToken(token) {
+        const data = this.readData();
+        return data.filter(item => item.resetPasswordToken === token);
+    }
+
 }
 
 module.exports = DataModel;

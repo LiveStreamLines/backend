@@ -15,7 +15,7 @@ function login(req, res) {
 
       // Check if phone is registered
       if (!user.phone) {
-        return res.status(200).json({ phoneRequired: true, msg: 'Phone verification required.' });
+        return res.status(200).json({ phoneRequired: true, userId: user._id, msg: 'Phone verification required.' });
       }
   
       // Create a JWT token with user information

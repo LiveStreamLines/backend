@@ -30,7 +30,7 @@ exports.sendOtp = (req, res) => {
 
 // Verify OTP
 exports.verifyOtp = (req, res) => {
-  const { phone, otp } = req.body;
+  const { phone, otp, userId } = req.body;
 
   if (!phone || !otp) {
     return res.status(400).json({ error: 'Phone and OTP are required' });
@@ -40,17 +40,25 @@ exports.verifyOtp = (req, res) => {
     .verificationChecks.create({ to: phone, code: otp })
     .then((verificationCheck) => {
       if (verificationCheck.status === 'approved') {
-        // Fetch the user from the database
-        let user = userData.findUserByPhone(phone);
-
-        if (!user) {
-           // Handle new phone registration
-           user = userData.registerPhoneForUser(phone); // Add phone registration logic
+        let user;
+        if (userId) {
+            // If userId is provided, associate the phone with the user
+            user = userData.getItemById(userId);
+            if (user) {
+                user.phone = phone; // Associate the phone number
+                userData.updateItem(userId, user); // Save updated user data
+            }
+        } else {
+            // For phone login, find user by phone
+            user = userData.findUserByPhone(phone);
         }
 
-        // Check if user is active
+        if (!user) {
+            return res.status(401).json({ msg: 'User not found' });
+        }
+
         if (!user.isActive) {
-          return res.status(403).json({ msg: 'User account is inactive' });
+            return res.status(403).json({ msg: 'User account is inactive' });
         }
 
         // Generate a JWT token

@@ -72,7 +72,7 @@ async function sendResetPasswordLink(req, res) {
       });
   
       // Create reset link
-      const resetLink = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
+      const resetLink = `${req.protocol}://5.9.85.25:4200/reset-password/${resetToken}`;
   
       // Send reset email to the provided reset_email
       const emailSubject = 'Password Reset Request';

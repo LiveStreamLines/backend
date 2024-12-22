@@ -7,6 +7,7 @@ const authMiddleware = require('../controllers/authMiddleware');
 
 router.use(authMiddleware);
 
+router.post('/reset-password', userController.sendResetPasswordLink);
 router.get('/', userController.getAllUsers);
 router.get('/:id', userController.getUserById);
 router.post('/', userController.addUser);

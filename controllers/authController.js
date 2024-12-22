@@ -1,7 +1,7 @@
 // controllers/authController.js
 const jwt = require('jsonwebtoken');
 const userData = require('../models/userData'); // Import usersData here
-
+const bcrypt = require('bcrypt');
 
 function login(req, res) {
     const { email, password } = req.body;
@@ -41,6 +41,43 @@ function login(req, res) {
     }
 }
 
+async function resetPassword(req, res) {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ msg: 'Token and new password are required' });
+    }
+
+    // Find user by token
+    const user = await userData.findUserByToken(token);
+    if (!user) {
+      return res.status(400).json({ msg: 'Invalid or expired token' });
+    }
+
+    // Check token expiry
+    if (user.resetPasswordExpires < Date.now()) {
+      return res.status(400).json({ msg: 'Token has expired' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password and clear the token
+    await userData.updateUserById(user.id, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    });
+
+    res.status(200).json({ msg: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ msg: 'An error occurred. Please try again.' });
+  }
+}
+
 module.exports = {
-    login
+    login,
+    resetPassword
 };

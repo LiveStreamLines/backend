@@ -113,6 +113,11 @@ class DataModel {
         return data.filter(item => item.projectTag === tag);
     }
 
+    getUserByEmail(email) {
+        const data = this.readData();
+        return data.filter(item => item.email === email);
+    }
+
     getUserByToken(token) {
         const data = this.readData();
         return data.filter(item => item.resetPasswordToken === token);

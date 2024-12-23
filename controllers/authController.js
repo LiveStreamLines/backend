@@ -41,7 +41,9 @@ function login(req, res) {
         developers: developerIds,
         projects: projectIds, 
         cameras: cameraIds,
-        services: services     
+        services: services,
+        canAdduser: user.canAddUser,
+        canGenerateVideoAndPics: user.canGenerateVideoAndPics
       });
     } else {
       res.status(401).json({ msg: 'Invalid credentials' });

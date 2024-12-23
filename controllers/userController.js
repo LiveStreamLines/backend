@@ -19,17 +19,6 @@ function getUserById(req, res) {
     }
 }
 
-// Controller for getting a single User by ID
-function getUserByEmail(req, res) {
-  const user = userData.getUserByEmail(req.params.email);
-  if (user) {
-      res.json(user);
-  } else {
-      res.status(404).json({ message: 'User not found' });
-  }
-}
-
-
 // Controller for adding a new User
 function addUser(req, res) {
     const newUser = req.body;
@@ -105,7 +94,6 @@ async function sendResetPasswordLink(req, res) {
 module.exports = {
     getAllUsers,
     getUserById,
-    getUserByEmail,
     addUser,
     updateUser,
     deleteUser,

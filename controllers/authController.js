@@ -50,6 +50,19 @@ function login(req, res) {
     }
 }
 
+// Controller for getting a single User by Email
+function getUserByEmail(req, res) {
+  const user = userData.getUserByEmail(req.params.email);
+  if (user) {
+      res.json(user);
+  } else {
+      res.status(404).json({ message: 'User not found' });
+  }
+}
+
+
+
+
 function resetPassword(req, res) {
  
     const { token, newPassword } = req.body;
@@ -90,5 +103,6 @@ function resetPassword(req, res) {
 
 module.exports = {
     login,
+    getUserByEmail,
     resetPassword
 };

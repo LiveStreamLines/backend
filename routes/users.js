@@ -10,7 +10,6 @@ router.use(authMiddleware);
 router.post('/reset-password', userController.sendResetPasswordLink);
 router.get('/', userController.getAllUsers);
 router.get('/:id', userController.getUserById);
-router.get('/email/:email', userController.getUserByEmail);
 router.post('/', userController.addUser);
 router.put('/:id', userController.updateUser);
 router.delete('/:id', userController.deleteUser);

@@ -18,7 +18,7 @@ exports.sendOtp = (req, res) => {
   }
 
   client.verify.v2.services(process.env.TWILIO_SERVICE_SID)
-    .verifications.create({ to: phone, channel: 'sms' })
+    .verifications.create({ to: phone, channel: 'sms', locale: 'en' })
     .then(() => {
       res.status(200).json({ message: 'OTP sent successfully' });
     })

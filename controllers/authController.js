@@ -1,7 +1,10 @@
 // controllers/authController.js
-const jwt = require('jsonwebtoken');
 const userData = require('../models/userData'); // Import usersData here
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const sendEmail = require('../utils/email'); // Replace with your email utility
+
 
 function login(req, res) {
     const { email, password } = req.body;

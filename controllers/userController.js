@@ -1,6 +1,4 @@
 const userData = require('../models/userData');
-const crypto = require('crypto');
-const sendEmail = require('../utils/email'); // Replace with your email utility
 
 
 // Controller for getting all Users

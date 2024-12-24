@@ -93,11 +93,37 @@ function sendResetPasswordLink(req, res) {
   // Send reset email to the provided reset_email
   const emailSubject = 'Password Reset Request';
   const emailBody = `
-    <p>You requested a password reset.</p>
-    <p>Click the link below to reset your password:</p>
-    <a href="${resetLink}">${resetLink}</a>
-    <p>This link will expire in 1 hour.</p>
-  `;
+  <div style="max-width: 600px; margin: auto; font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+    <!-- Header Section with Logo -->
+    <div style="background: #710707; padding: 20px; text-align: center;">
+      <img src="http://5.9.85.250:4200/assets/lsl.svg" alt="Company Logo" style="max-height: 50px;">
+    </div>
+
+    <!-- Main Content Section -->
+    <div style="padding: 20px; color: #333;">
+      <h2 style="color: #710707;">Password Reset Request</h2>
+      <p style="line-height: 1.6;">
+        You requested a password reset. Click the link below to reset your password:
+      </p>
+      <p style="text-align: center; margin: 20px 0;">
+        <a href="${resetLink}" style="background: #710707; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+          Reset Your Password
+        </a>
+      </p>
+      <p style="line-height: 1.6; color: #555;">
+        This link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email.
+      </p>
+    </div>
+
+    <!-- Footer Section -->
+    <div style="background: #f4f4f4; padding: 10px 20px; text-align: center; color: #888; font-size: 12px;">
+      <p style="margin: 0;">© 2024 Live Stream Lines LLC</p>
+      <p style="margin: 0;">712, Clover Bay Tower, Marasi Dr, Business Bay, Dubai, UAE</p>
+      <p style="margin: 0;">Level 18, Faisaliah Tower, King Fahad Highway, 
+      Olaya District P.O. Box 54995, Riyadh, kingdom of saudi arabia</p>
+    </div>
+  </div>
+`;
   const email = sendEmail(reset_email, emailSubject, emailBody); // Send email to reset_email
   
   if (email) {

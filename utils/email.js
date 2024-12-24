@@ -7,14 +7,14 @@ const sendEmail = async (to, subject, html) => {
         port: 465, // Use 465 for SSL or 587 for TLS
         secure: true, // Use true for 465, false for other ports
         auth: {
-          user: 'amar@livestreamlines.com', // Your email address
-          pass: 'interQAZ@159', // Your password or app-specific password
+          user: 'system@livestreamlines.com', // Your email address
+          pass: 'lsl@123@LSL', // Your password or app-specific password
         },
       });
   
       // Email options
       const mailOptions = {
-        from: 'amar@livestreamlines.com', // Sender's address
+        from: 'system@livestreamlines.com', // Sender's address
         to, // Recipient's address
         subject, // Subject line
         html, // HTML body

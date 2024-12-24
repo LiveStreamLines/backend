@@ -54,7 +54,7 @@ function login(req, res) {
 function getUserByEmail(req, res) {
   const user = userData.getUserByEmail(req.params.email);
   if (user) {
-      res.json(user);
+      res.json(user[0]._id);
   } else {
       res.status(404).json({ message: 'User not found' });
   }

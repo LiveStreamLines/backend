@@ -12,7 +12,7 @@ const path = require('path');
 // Configure multer for file storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadPath = path.join(__dirname, '../media/canvas_images');
+        const uploadPath = process.env.MEDIA_PATH + '/canvas_images';
         cb(null, uploadPath); // Specify the upload directory
     },
     filename: (req, file, cb) => {

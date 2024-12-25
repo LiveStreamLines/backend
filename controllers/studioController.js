@@ -7,7 +7,7 @@ function saveCanvasImage(req, res) {
         return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const fileUrl = `/media/canvas_images/${req.file.filename}`;
+    const fileUrl = `${process.env.MEDIA_PATH}/canvas_images/${req.file.filename}`;
     res.json({ url: fileUrl }); // Respond with the file URL
 }
 

@@ -16,6 +16,7 @@ const videoRoutes = require ('./routes/video');
 const weatherRoutes = require ('./routes/weather');
 const mediaRoutes = require ('./routes/media');
 const otpRoutes = require('./routes/otp');
+const studioRoutes = require('./routes/studio');
 
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/video', videoRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/otp', otpRoutes);
+app.use('/api/studio', studioRoutes);
 
 
 const PORT = 5000;

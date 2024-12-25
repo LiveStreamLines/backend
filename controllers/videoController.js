@@ -67,7 +67,7 @@ function generateVideoRequest(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
     duration, showdate = false, showedText = '', 
-    resolution = '720', music = 'false', contrast = '1.0', brightness = '0.0', saturation = '1.0'
+    resolution = '720', music = 'false', musicFile='', contrast = '1.0', brightness = '0.0', saturation = '1.0'
   } = req.body;
 
   try {
@@ -103,7 +103,7 @@ function generateVideoRequest(req, res) {
       showedText,
       showedWatermark,
       logo,
-      music,
+      music, musicFile,
       contrast, brightness, saturation,
       status: 'queued',
     };
@@ -203,7 +203,7 @@ function processVideoRequest(queuedRequest) {
 
   // Invoke generateVideoFromList
   const { developerTag, projectTag, camera, id: requestId, filteredImageCount, 
-    frameRate, resolution, showdate, showedText, showedWatermark, logo, music,
+    frameRate, resolution, showdate, showedText, showedWatermark, logo, music, musicFile,
     contrast, brightness, saturation} = queuedRequest;
 
     const requestPayload = {
@@ -218,7 +218,7 @@ function processVideoRequest(queuedRequest) {
     showedText,
     showedWatermark,
     logo,
-    music,
+    music, musicFile,
     contrast, brightness, saturation
   };
 
@@ -247,7 +247,7 @@ function processVideoRequest(queuedRequest) {
 
 function processVideoInChunks(payload, callback) {
   const { developerId, projectId, cameraId, requestId, frameRate, 
-    resolution, showdate, showedText, showedWatermark, logo, music,
+    resolution, showdate, showedText, showedWatermark, logo, music, musicFile,
     contrast, brightness, saturation,
   } = payload;
 
@@ -279,7 +279,7 @@ function processVideoInChunks(payload, callback) {
       if (showedWatermark) {
         fs.unlinkSync(showedWatermark);
       }
-      concatenateVideos(partialVideos, outputVideoPath, music, contrast, brightness, saturation, callback);
+      concatenateVideos(partialVideos, outputVideoPath, music, musicFile, contrast, brightness, saturation, callback);
       return;
     }
 
@@ -392,7 +392,7 @@ function processVideoInChunks(payload, callback) {
 }
 
 
-function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, contrast, brightness, saturation, callback) {
+function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, musicFile, contrast, brightness, saturation, callback) {
   const concatListPath = path.join(path.dirname(outputVideoPath), `concat_list.txt`);
   const tempConcatenatedVideoPath = outputVideoPath.replace('.mp4', '_no_audio.mp4');
   const concatContent = videoPaths.map(video => `file '${video}'`).join('\n');
@@ -410,7 +410,7 @@ function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, cont
 
       // Step 2: Add visual effects and background music (if applicable)
       const backgroundMusicPath = path
-        .join(process.env.MEDIA_PATH, '/music/back.mp3')
+        .join(process.env.MEDIA_PATH, '/music/',musicFile)
         .replace(/\\/g, '/'); 
 
       const ffmpegCommand = ffmpeg()

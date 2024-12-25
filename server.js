@@ -26,6 +26,7 @@ app.use(bodyParser.json());
 
 // Middleware to serve static files for media
 app.use('/media/upload', express.static(process.env.MEDIA_PATH +'/upload'));
+app.use('/canvas_images', express.static(process.env.MEDIA_PATH +'/canvas_images'));
 
 // Use routes
 app.use('/logos', logoRoutes);

@@ -16,14 +16,14 @@ function getCameraPictures (req, res) {
 
   // Check if the camera directory exists
   if (!fs.existsSync(cameraPath)) {
-    return res.status(404).json({ error: 'Camera directory not found' });
+    return res.json({ error: 'Camera directory not found' });
   }
 
   // Read all image files in the camera directory
   const files = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
 
   if (files.length === 0) {
-    return res.status(404).json({ error: 'No pictures found in camera directory' });
+    return res.json({ error: 'No pictures found in camera directory' });
   }
 
   // Sort files by name to get the first and last pictures

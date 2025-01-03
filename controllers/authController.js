@@ -88,7 +88,7 @@ function sendResetPasswordLink(req, res) {
   });
 
   // Create reset link
-  const resetLink = `${req.protocol}://5.9.85.250:4200/reset-password/${resetToken}`;
+  const resetLink = `https://lsl-platform.com/reset-password/${resetToken}`;
 
   // Send reset email to the provided reset_email
   const emailSubject = 'Password Reset Request';
@@ -96,7 +96,7 @@ function sendResetPasswordLink(req, res) {
   <div style="max-width: 600px; margin: auto; font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
     <!-- Header Section with Logo -->
     <div style="background: #710707; padding: 20px; text-align: center;">
-      <img src="http://5.9.85.250:5000/logos/developer/logo.png" alt="Company Logo" style="max-height: 50px;">
+      <img src="https://lsl-platform.com/backend/logos/developer/3e7b411f42082d860818cbad.png" alt="Company Logo" style="max-height: 50px;">
     </div>
 
     <!-- Main Content Section -->

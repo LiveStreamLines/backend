@@ -24,6 +24,10 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Increase payload size limit
+app.use(express.json({ limit: '50mb' })); // Adjust the limit as needed
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 // Middleware to serve static files for media
 app.use('/media/upload', express.static(process.env.MEDIA_PATH +'/upload'));
 app.use('/canvas_images', express.static(process.env.MEDIA_PATH +'/canvas_images'));

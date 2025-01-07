@@ -22,9 +22,9 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   const developer = developerData.getDeveloperByTag(developerId);
   const project = projectData.getProjectByTag(projectId);
  
-  const devloper_id = developer[0]._id;
+  const developer_id = developer[0]._id;
   const developerName = developer[0].developerName;
-  const project_id = project[0]._id
+  const project_id = project[0]._id;
   const projectName = project[0].projectName;
 
   // Define the camera folder path
@@ -62,7 +62,7 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   .map(file => `file '${path.join(PicsPath, file).replace(/\\/g, '/')}'`)
   .join('\n');  fs.writeFileSync(listFilePath, fileListContent);
 
-  return {uniqueId, listFileName, numFilteredPics, developerName, projectName, devloper_id, project_id};
+  return {uniqueId, listFileName, numFilteredPics, developerName, projectName, developer_id, project_id};
 }
 
 function generateVideoRequest(req, res) {

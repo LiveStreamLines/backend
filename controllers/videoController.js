@@ -130,7 +130,7 @@ function generatePhotoRequest(req, res) {
   const { developerId, projectId, cameraId, date1, date2, hour1, hour2 } = req.body;
 
   try {
-    const { uniqueId, listFileName, numFilteredPics, developerName, projectName } = filterImage({
+    const { uniqueId, listFileName, numFilteredPics, developerName, projectName, developer_id, project_id } = filterImage({
       developerId, projectId, cameraId, date1, date2, hour1, hour2});
 
     if (numFilteredPics === 0) {
@@ -139,6 +139,8 @@ function generatePhotoRequest(req, res) {
 
     const logEntry = {
       type: "photo",
+      developerID: developer_id,
+      projectID: project_id,
       developerTag: developerId,
       projectTag: projectId,
       developer: developerName,

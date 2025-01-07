@@ -21,8 +21,10 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
 {
   const developer = developerData.getDeveloperByTag(developerId);
   const project = projectData.getProjectByTag(projectId);
-  
+ 
+  const devloper_id = developer[0]._id;
   const developerName = developer[0].developerName;
+  const project_id = project[0]._id
   const projectName = project[0].projectName;
 
   // Define the camera folder path
@@ -60,7 +62,7 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   .map(file => `file '${path.join(PicsPath, file).replace(/\\/g, '/')}'`)
   .join('\n');  fs.writeFileSync(listFilePath, fileListContent);
 
-  return {uniqueId, listFileName, numFilteredPics, developerName, projectName};
+  return {uniqueId, listFileName, numFilteredPics, developerName, projectName, devloper_id, project_id};
 }
 
 function generateVideoRequest(req, res) {
@@ -71,7 +73,7 @@ function generateVideoRequest(req, res) {
   } = req.body;
 
   try {
-    const { uniqueId, listFileName, numFilteredPics, developerName, projectName } = filterImage({
+    const { uniqueId, listFileName, numFilteredPics, developerName, projectName, developer_id, project_id } = filterImage({
       developerId, projectId, cameraId, date1, date2, hour1, hour2 });
 
       const logo = req.files?.logo ? req.files.logo[0].path : null;
@@ -84,6 +86,8 @@ function generateVideoRequest(req, res) {
 
     const logEntry = {
       type: "video",
+      developerID: developer_id,
+      projectID: project_id,
       developerTag: developerId,
       projectTag: projectId,
       developer: developerName,

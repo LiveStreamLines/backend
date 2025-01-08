@@ -7,7 +7,7 @@ const authMiddleware = require('../controllers/authMiddleware');
 router.use(authMiddleware);
 
 router.get('/', cameraController.getAllCameras);
-router.get('/last', cameraController.getLastPicturesFromAllCameras);
+router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
 router.get('/:id', cameraController.getCameraById);
 router.get('/proj/:id', cameraController.getCameraByProject);
 router.post('/', cameraController.addCamera);

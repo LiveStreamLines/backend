@@ -36,10 +36,10 @@ function getCameraByProject(req, res) {
 function getLastPicturesFromAllCameras(req, res) {
     // Fetch all cameras
     const cameras = cameraData.getAllItems(); // Assuming this function retrieves all cameras
+    const now = new Date(); // Get the current time
 
     // Prepare response array
     const lastPictures = cameras.map(camera => {
-
         const project = projectData.getItemById(camera.project);
         const developer = developerData.getItemById(camera.developer);
         const projectTag = project.projectTag;
@@ -65,10 +65,32 @@ function getLastPicturesFromAllCameras(req, res) {
         // Sort files by name to get the last picture
         const sortedFiles = files.sort();
         const lastPic = sortedFiles[sortedFiles.length - 1];
+        // Extract full timestamp from filename (assuming YYYYMMDD_HHmmss format)
+        const timestampMatch = lastPic.match(/^(\d{8})_(\d{6})/); // Match YYYYMMDD_HHmmss
+        if (!timestampMatch) {
+            return { FullName, error: 'Invalid file format' };
+        }
+
+        const [_, datePart, timePart] = timestampMatch;
+        const lastPicDateTime = new Date(
+            parseInt(datePart.slice(0, 4)),      // Year
+            parseInt(datePart.slice(4, 6)) - 1, // Month (0-based)
+            parseInt(datePart.slice(6, 8)),     // Day
+            parseInt(timePart.slice(0, 2)),     // Hours
+            parseInt(timePart.slice(2, 4)),     // Minutes
+            parseInt(timePart.slice(4, 6))      // Seconds
+        );
+
+        // Calculate the difference in hours and minutes
+        const diffMs = now - lastPicDateTime;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
 
         return {
             FullName,
-            lastPhoto: lastPic.replace('.jpg', '')
+            lastPhoto: lastPicDateTime.toISOString(),
+            diff: `${diffHours}h:${diffMinutes}min`
         };
     });
 

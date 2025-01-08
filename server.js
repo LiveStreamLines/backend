@@ -25,7 +25,13 @@ app.use(cors({
   origin: 'https://lsl-platform.com', // Replace with your front-end domain or IP
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true, // Allow cookies if necessary
-}));
+},
+{
+  origin: 'http://localhost:4200', // Replace with your front-end domain or IP
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true, // Allow cookies if necessary
+}
+));
 app.use(bodyParser.json());
 
 // Increase payload size limit

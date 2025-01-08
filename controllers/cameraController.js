@@ -36,7 +36,9 @@ function getCameraByProject(req, res) {
 function getLastPicturesFromAllCameras(req, res) {
     // Fetch all cameras
     const cameras = cameraData.getAllItems(); // Assuming this function retrieves all cameras
-    const now = new Date(); // Get the current time
+    const servernow = new Date(); // Get the current time
+    const now = new Date(now.getTime() + 4 * 60 * 1000);
+
 
     // Prepare response array
     const lastPictures = cameras.map(camera => {

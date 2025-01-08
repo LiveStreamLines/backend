@@ -37,7 +37,7 @@ function getLastPicturesFromAllCameras(req, res) {
     // Fetch all cameras
     const cameras = cameraData.getAllItems(); // Assuming this function retrieves all cameras
     const servernow = new Date(); // Get the current time
-    const now = new Date(servernow.getTime() - 4 * 60 * 1000);
+    const now = new Date(servernow.getTime() + 4 * 60 * 60 * 1000);
 
 
     // Prepare response array

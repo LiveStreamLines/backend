@@ -45,7 +45,7 @@ function getLastPicturesFromAllCameras(req, res) {
         const projectTag = project.projectTag;
         const developerTag = developer.developerTag;
         const cameraName = camera.camera;
-        const FullName = developerTag + "/" + projectTag + "/" + cameraName;
+        const FullName = developerTag + "/" + projectTag + "/" + cameraName + `(${camera.serveFolder})`;
         // Define the path to the camera's pictures
         const cameraPath = path.join(mediaRoot, developerTag, projectTag, cameraName, 'large');
 

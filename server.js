@@ -21,7 +21,11 @@ const studioRoutes = require('./routes/studio');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://lsl-platform.com', // Replace with your front-end domain or IP
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true, // Allow cookies if necessary
+}));
 app.use(bodyParser.json());
 
 // Increase payload size limit
@@ -49,6 +53,6 @@ app.use('/api/studio', studioRoutes);
 
 
 const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
 });

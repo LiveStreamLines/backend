@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const cameraData = require('../models/cameraData');
 const developerData = require('../models/developerData');
 const projectData = require("../models/projectData");

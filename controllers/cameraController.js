@@ -1,4 +1,6 @@
 const cameraData = require('../models/cameraData');
+const developerData = require('../models/developerData');
+const projectData = require("../models/projectData");
 
 
 // Controller for getting all Cameras
@@ -27,6 +29,46 @@ function getCameraByProject(req, res) {
     }
 }
 
+function getLastPicturesFromAllCameras(req, res) {
+    // Fetch all cameras
+    const cameras = cameraData.getAllItems(); // Assuming this function retrieves all cameras
+
+    // Prepare response array
+    const lastPictures = cameras.map(camera => {
+
+        const project = projectData.getItemById(camera.project);
+        const developer = developerData.getItemById(camera.developer);
+        const projectTag = project.projectTag;
+        const developerTag = developer.developerTag;
+        const cameraName = camera.camera;
+        const FullName = developerTag + "/" + projectTag + "/" + cameraName;
+        // Define the path to the camera's pictures
+        const cameraPath = path.join(mediaRoot, developerTag, projectTag, cameraName, 'large');
+
+        // Check if the camera directory exists
+        if (!fs.existsSync(cameraPath)) {
+            return { FullName, error: 'Camera directory not found' };
+        }
+
+        // Read all image files in the camera directory
+        const files = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
+
+        if (files.length === 0) {
+            return { FullName, error: 'No pictures found in camera directory' };
+        }
+
+        // Sort files by name to get the last picture
+        const sortedFiles = files.sort();
+        const lastPic = sortedFiles[sortedFiles.length - 1];
+
+        return {
+            FullName,
+            lastPhoto: lastPic.replace('.jpg', '')
+        };
+    });
+
+    res.json(lastPictures);
+}
 
 // Controller for adding a new Camera
 function addCamera(req, res) {
@@ -57,6 +99,7 @@ function deleteCamera(req, res) {
 
 module.exports = {
     getAllCameras,
+    getLastPicturesFromAllCameras,
     getCameraById,
     getCameraByProject,
     addCamera,

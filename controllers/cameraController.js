@@ -4,6 +4,8 @@ const cameraData = require('../models/cameraData');
 const developerData = require('../models/developerData');
 const projectData = require("../models/projectData");
 
+const mediaRoot = process.env.MEDIA_PATH + '/upload';
+
 
 // Controller for getting all Cameras
 function getAllCameras(req, res) {

@@ -66,7 +66,7 @@ function getLastPicturesFromAllCameras(req, res) {
         const sortedFiles = files.sort();
         const lastPic = sortedFiles[sortedFiles.length - 1];
         // Extract full timestamp from filename (assuming YYYYMMDD_HHmmss format)
-        const timestampMatch = lastPic.match(/^(\d{8})_(\d{6})/); // Match YYYYMMDD_HHmmss
+        const timestampMatch = lastPic.match(/^(\d{8})(\d{6})/); // Match YYYYMMDDHHmmss
         if (!timestampMatch) {
             return { FullName, error: 'Invalid file format' };
         }

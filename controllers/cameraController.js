@@ -92,6 +92,8 @@ function getLastPicturesFromAllCameras(req, res) {
         return {
             FullName,
             lastPhoto: lastPicDateTime.toISOString(),
+            servertime: servernow,
+            adjusted: now,
             diff: `${diffHours}h:${diffMinutes}min`
         };
     });

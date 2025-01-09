@@ -90,11 +90,13 @@ function getLastPicturesFromAllCameras(req, res) {
 
 
         return {
-            FullName,
-            lastPhoto: lastPicDateTime.toISOString(),
-            servertime: servernow,
-            adjusted: now,
-            diff: `${diffHours}h:${diffMinutes}min`
+            FullName: FullName,
+            developer: developerTag,
+            project: projectTag,
+            cameraName: cameraName,
+            serverfolder: serverfolder,
+            lastPhoto: lastPic,
+            lastPhotoTime: lastPicDateTime.toISOString()            
         };
     });
 

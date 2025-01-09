@@ -37,6 +37,7 @@ function login(req, res) {
   
       res.json({ 
         authh: authToken, 
+        userId: user._id,
         username: user.name,
         email: user.email,
         phone: user.phone,
@@ -46,7 +47,8 @@ function login(req, res) {
         cameras: cameraIds,
         services: services,
         canAdduser: user.canAddUser,
-        canGenerateVideoAndPics: user.canGenerateVideoAndPics
+        canGenerateVideoAndPics: user.canGenerateVideoAndPics,
+        manual: user.manual
       });
     } else {
       res.status(401).json({ msg: 'Invalid credentials' });

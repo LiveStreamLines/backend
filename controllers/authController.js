@@ -88,6 +88,7 @@ function sendResetPasswordLink(req, res) {
     resetPasswordToken: resetToken,
     resetPasswordExpires: tokenExpiry,
   });
+  console.log(user_id);
 
   // Create reset link
   const resetLink = `https://lsl-platform.com/reset-password/${resetToken}`;
@@ -105,6 +106,7 @@ function sendResetPasswordLink(req, res) {
     <div style="padding: 20px; color: #333;">
       <h2 style="color: #710707;">Password Reset Request</h2>
       <p style="line-height: 1.6;">
+        <b>Dear ${user.name}:</b><br/>
         You requested a password reset. Click the link below to reset your password:
       </p>
       <p style="text-align: center; margin: 20px 0;">

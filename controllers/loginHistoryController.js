@@ -1,4 +1,4 @@
-const loginHistoryData = require('../models/loginHistory');
+const loginHistoryData = require('../models/loginHistoryData');
 
 exports.addLoginHistory = (req, res) => {
     const user = req.user; // Assuming authMiddleware adds user info to req

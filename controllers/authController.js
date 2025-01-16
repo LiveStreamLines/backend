@@ -129,8 +129,8 @@ function sendResetPasswordLink(req, res) {
   </div>
 `;
 
-  reset_email = reset_email.toLowerCase();
-  const email = sendEmail(reset_email, emailSubject, emailBody); // Send email to reset_email
+  const reset_email_send = reset_email.toLowerCase();
+  const email = sendEmail(reset_email_send, emailSubject, emailBody); // Send email to reset_email
   
   if (email) {
     res.status(200).json({ msg: 'Password reset link sent successfully' });

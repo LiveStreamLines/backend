@@ -128,6 +128,8 @@ function sendResetPasswordLink(req, res) {
     </div>
   </div>
 `;
+
+  reset_email = reset_email.toLowerCase();
   const email = sendEmail(reset_email, emailSubject, emailBody); // Send email to reset_email
   
   if (email) {

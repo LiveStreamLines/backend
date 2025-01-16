@@ -17,7 +17,7 @@ const weatherRoutes = require ('./routes/weather');
 const mediaRoutes = require ('./routes/media');
 const otpRoutes = require('./routes/otp');
 const studioRoutes = require('./routes/studio');
-
+const loginHistoryRoutes = require('./routes/loginHistory');
 
 const app = express();
 
@@ -46,7 +46,7 @@ app.use('/api/weather', weatherRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api/studio', studioRoutes);
-
+app.use('/api/history', loginHistoryRoutes);
 
 const PORT = 5000;
 app.listen(PORT, '0.0.0.0', () => {

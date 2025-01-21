@@ -1,9 +1,11 @@
 const loginHistoryData = require('../models/loginHistoryData');
 
 exports.addLoginHistory = (req, res) => {
-    const user = req.userlogin; // Assuming authMiddleware adds user info to req
+    const user = req; // Assuming authMiddleware adds user info to req
     const newLoginRecord = {
-        user: user,
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
         loginTime: new Date().toISOString(),
     };
 

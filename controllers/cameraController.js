@@ -46,6 +46,8 @@ function getLastPicturesFromAllCameras(req, res) {
         const developer = developerData.getItemById(camera.developer);
         const projectTag = project.projectTag;
         const developerTag = developer.developerTag;
+        const projectId = project._id;
+        const developerId = developer._id;
         const projectName = project.projectName;
         const developerName = developer.developerName;
         const cameraName = camera.camera;
@@ -93,6 +95,8 @@ function getLastPicturesFromAllCameras(req, res) {
 
         return {
             FullName: FullName,
+            developerId: developerId,
+            projectId: projectId,
             developerTag: developerTag,
             projectTag: projectTag,
             developer: developerName,

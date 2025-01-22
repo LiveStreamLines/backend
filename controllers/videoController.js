@@ -514,6 +514,15 @@ function getAllVideoRequest(req, res) {
   })));
 }
 
+// Controller for deleting a Project
+function deleteVideoRequest(req, res) {
+  const isDeleted = videoRequestData.deleteItem(req.params.id);
+  if (isDeleted) {
+      res.status(204).send();
+  } else {
+      res.status(404).json({ message: 'Project not found' });
+  }
+}
 
 function getVideoRequestbyDeveloper(req, res){
   const videoRequest = videoRequestData.getRequestByDeveloperTag(req.params.tag);
@@ -538,5 +547,6 @@ module.exports = {
   generatePhotoRequest,
   getAllVideoRequest,
   getVideoRequestbyDeveloper,
-  getAllPhotoRequest
+  getAllPhotoRequest,
+  deleteVideoRequest
 };

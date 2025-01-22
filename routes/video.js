@@ -16,6 +16,7 @@ router.post('/videoGen', upload.fields([
 router.post('/photoGen', upload.none(), videoController.generatePhotoRequest);
 router.get('/videoRequest',videoController.getAllVideoRequest);
 router.get('/photoRequest',videoController.getAllPhotoRequest);
+router.delete('/videoRequest/:id', videoController.deleteVideoRequest);
 
 
 module.exports = router;

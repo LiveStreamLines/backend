@@ -1,0 +1,29 @@
+[
+  {
+    "_id": "7f50664528a37e1ce22d5006",
+    "loginTime": "2025-01-22T07:47:49.050Z",
+    "isActive": true,
+    "createdDate": "2025-01-22T07:47:49.050Z"
+  },
+  {
+    "_id": "819f19b879645e802b7e4502",
+    "loginTime": "2025-01-22T07:48:45.711Z",
+    "isActive": true,
+    "createdDate": "2025-01-22T07:48:45.711Z"
+  },
+  {
+    "_id": "ade66e7607dc0a476253eebb",
+    "loginTime": "2025-01-22T07:51:06.294Z",
+    "isActive": true,
+    "createdDate": "2025-01-22T07:51:06.298Z"
+  },
+  {
+    "_id": "29dd52917190b394df748827",
+    "userId": "123456789",
+    "userName": "Ammar Omer",
+    "userEmail": "amar@livestreamlines.com",
+    "loginTime": "2025-01-22T07:52:06.453Z",
+    "isActive": true,
+    "createdDate": "2025-01-22T07:52:06.457Z"
+  }
+]

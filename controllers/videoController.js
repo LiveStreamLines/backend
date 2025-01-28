@@ -69,7 +69,10 @@ function generateVideoRequest(req, res) {
   const { developerId, projectId, cameraId, 
     date1, date2, hour1, hour2,
     duration, showdate = false, showedText = '', 
-    resolution = '720', music = 'false', musicFile='', contrast = '1.0', brightness = '0.0', saturation = '1.0'
+    resolution = '720', music = 'false', musicFile='', 
+    contrast = '1.0', brightness = '0.0', saturation = '1.0', 
+    userId,
+    userName
   } = req.body;
 
   try {
@@ -110,6 +113,8 @@ function generateVideoRequest(req, res) {
       music, musicFile,
       contrast, brightness, saturation,
       status: 'queued',
+      userId: userId,
+      userName: userName
     };
 
     videoRequestData.addItem(logEntry);
@@ -127,7 +132,7 @@ function generateVideoRequest(req, res) {
 
 // Function to handle photo ZIP generation requests
 function generatePhotoRequest(req, res) {
-  const { developerId, projectId, cameraId, date1, date2, hour1, hour2 } = req.body;
+  const { developerId, projectId, cameraId, date1, date2, hour1, hour2, userId, userName } = req.body;
 
   try {
     const { uniqueId, listFileName, numFilteredPics, developerName, projectName, developer_id, project_id } = filterImage({
@@ -155,6 +160,8 @@ function generatePhotoRequest(req, res) {
       RequestTime: new Date().toISOString(),
       filteredImageCount: numFilteredPics,
       status: 'queued',
+      userId: userId,
+      userName: userName
     };
 
     photoRequestData.addItem(logEntry);

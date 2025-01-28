@@ -54,6 +54,12 @@ function handleMediaForm(req, res) {
     }
 }
 
+function getMedia(req, res){
+  const media = mediaData.getAllItems();
+  res.json(media);
+}
+
 module.exports = {
     handleMediaForm,
+    getMedia
 };

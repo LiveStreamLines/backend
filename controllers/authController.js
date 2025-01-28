@@ -81,7 +81,7 @@ function sendResetPasswordLink(req, res) {
 
   // Generate a reset token and set expiry
   const resetToken = crypto.randomBytes(32).toString('hex');
-  const tokenExpiry = Date.now() + 3600000; // 1 hour
+  const tokenExpiry = Date.now() + 10800000; // 3 hour
 
   // Update user data with reset token and expiry
   const updateuser =  userData.updateItem(user_id, {
@@ -115,7 +115,7 @@ function sendResetPasswordLink(req, res) {
         </a>
       </p>
       <p style="line-height: 1.6; color: #555;">
-        This link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email.
+        This link will expire in 2 hour. If you did not request a password reset, you can safely ignore this email.
       </p>
     </div>
 

@@ -8,5 +8,6 @@ router.use(authMiddleware);
 router.post('/:developerId/:projectId/:cameraId/pictures/', cameraPicsController.getCameraPictures);
 router.get('/preview/:developerId/:projectId/:cameraId/', cameraPicsController.getCameraPreview);
 router.get('/preview-video/:developerId/:projectId/:cameraId/', cameraPicsController.generateWeeklyVideo);
+router.get('/emaar/:developerId/:projectId/:cameraId', cameraPicsController.getEmaarPics);
 
 module.exports = router;

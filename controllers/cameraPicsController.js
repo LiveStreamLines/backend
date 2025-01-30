@@ -177,9 +177,34 @@ function generateWeeklyVideo(req, res) {
   }
 }
 
+function getEmaarPics(req, res) {
+
+  const { developerId, projectId, cameraId } = req.params;
+  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
+  // Get list of JPG files
+  const files = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
+
+  // Filter files within the time range (08:00 - 17:59)
+  const filteredFiles = files.filter(file => {
+      const match = file.match(/^(\d{8})(\d{2})(\d{2})(\d{2})\.jpg$/);
+      if (!match) return false;
+
+      const hour = parseInt(match[2], 10);
+      return hour >= 8 && hour < 18; // Between 08:00 and 17:59
+  });
+
+  // Sort files in descending order (latest first)
+  filteredFiles.sort((a, b) => a.localeCompare(b));
+
+  // Return the last image (latest one in the time range)
+  filteredFiles.length > 0 ? res.json(filteredFiles) : res.status(404).json({error: "error"});
+}
+
+
 
 
 module.exports = {
+  getEmaarPics,
   getCameraPreview,
   generateWeeklyVideo,  
   getCameraPictures

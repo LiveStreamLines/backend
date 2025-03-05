@@ -76,6 +76,11 @@ class DataModel {
         return false;
     }
 
+     // Delete an Item
+     deleteAll() {
+            this.writeData([]);
+     }
+
     // New Method: Get Items by Developer ID (specific to projects)
     getProjectByDeveloperId(developerId) {
         const data = this.readData();

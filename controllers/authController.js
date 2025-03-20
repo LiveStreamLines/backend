@@ -8,8 +8,10 @@ const sendEmail = require('../utils/email'); // Replace with your email utility
 
 function login(req, res) {
     const { email, password } = req.body;
+    console.log(req.body);
     const user = userData.findUserByEmailAndPassword(email,password);
-  
+    console.log(user);
+    
     if (user) {
       // Check if user is active
       if (!user.isActive) {

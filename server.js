@@ -19,7 +19,9 @@ const otpRoutes = require('./routes/otp');
 const studioRoutes = require('./routes/studio');
 const loginHistoryRoutes = require('./routes/loginHistory');
 const hikTokenRoutes = require('./routes/hikToken');
-
+const memoryRoutes = require('./routes/memories');
+const invenotryRoutes = require('./routes/inventory');
+const deviceTypeRoutes = require('./routes/deviceType');
 
 const app = express();
 
@@ -50,7 +52,9 @@ app.use('/api/otp', otpRoutes);
 app.use('/api/studio', studioRoutes);
 app.use('/api/history', loginHistoryRoutes);
 app.use('/api/tokens', hikTokenRoutes);
-
+app.use('/api/memories', memoryRoutes);
+app.use('/api/inventory', invenotryRoutes);
+app.use('/api/device-types', deviceTypeRoutes);
 
 const PORT = 5000;
 app.listen(PORT, '0.0.0.0', () => {

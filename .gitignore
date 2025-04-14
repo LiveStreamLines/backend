@@ -50,3 +50,6 @@ Thumbs.db
 /data/photoRequest.json
 /data/media.json
 /data/users.json
+data/memories.json
+data/inventory.json
+data/deviceType.json

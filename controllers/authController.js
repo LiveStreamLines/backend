@@ -31,26 +31,15 @@ function login(req, res) {
       
   
       // Extract IDs for authorized developers and projects from the user object
-      const developerIds = user.accessibleDevelopers || [];
-      const projectIds = user.accessibleProjects || []; 
-      const cameraIds = user.accessibleCameras || []; 
-      const services = user.accessibleServices || [];
+      // const developerIds = user.accessibleDevelopers || [];
+      // const projectIds = user.accessibleProjects || []; 
+      // const cameraIds = user.accessibleCameras || []; 
+      // const services = user.accessibleServices || [];
       
   
       res.json({ 
-        authh: authToken, 
-        userId: user._id,
-        username: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        developers: developerIds,
-        projects: projectIds, 
-        cameras: cameraIds,
-        services: services,
-        canAdduser: user.canAddUser,
-        canGenerateVideoAndPics: user.canGenerateVideoAndPics,
-        manual: user.manual
+        ... user,
+        authh: authToken
       });
     } else {
       res.status(401).json({ msg: 'Invalid credentials' });

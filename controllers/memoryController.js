@@ -13,6 +13,16 @@ exports.getMemorybyId = (req, res) => {
     }
 };
 
+exports.getMemoryByInfo = (req, res) => {
+    const { developer, project, camera } = req.body;
+    const memory = MemoryData.findMemory(developer, project, camera);
+    if (memory && memory.length > 0) {
+        res.json({result: memory[0]._id});
+    } else {
+        res.json({ result: "False"});
+    }
+}
+
 exports.addMemory = (req, res) => {
   const newMemory = MemoryData.addItem(req.body);
   res.status(201).json(newMemory);

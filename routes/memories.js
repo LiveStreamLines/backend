@@ -7,6 +7,7 @@ const memoryController = require('../controllers/memoryController');
 
 router.get('/', memoryController.getMemories);
 router.get('/:id', memoryController.getMemorybyId);
+router.post('/find/', memoryController.getMemoryByInfo);
 router.post('/', memoryController.addMemory);
 router.put('/:id', memoryController.updateMemory);
 

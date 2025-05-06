@@ -29,7 +29,20 @@ function getProjectByDeveloper(req, res) {
     }
 }
 
-// Controller for getting projects in Developer
+function getProjectByDeveloperTag(req, res) {
+
+    const developer = developerData.getDeveloperByTag(req.params.tag);
+    console.log(req.params.tag);
+    console.log(developer);
+
+    const project = projectData.getProjectByDeveloperId(developer[0]._id);
+    if (project) {
+        res.json(project);
+    } else {
+        res.status(404).json({ message: 'Project not found' });
+    }
+}
+
 function getProjectByTag(req, res) {
     const project = projectData.getProjectByTag(req.params.tag);
     if (project) {
@@ -110,6 +123,7 @@ module.exports = {
     getAllProjects,
     getProjectById,
     getProjectByDeveloper,
+    getProjectByDeveloperTag,
     getProjectByTag,
     addProject,
     updateProject,

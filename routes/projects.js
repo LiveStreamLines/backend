@@ -26,6 +26,7 @@ const upload = multer({ storage });
 router.get('/', projectController.getAllProjects);
 router.get('/:id', projectController.getProjectById);
 router.get('/dev/:id', projectController.getProjectByDeveloper);
+router.get('/devTag/:tag', projectController.getProjectByDeveloperTag);
 router.get('/tag/:tag', projectController.getProjectByTag);
 router.post('/', upload.single('logo'),projectController.addProject);
 router.put('/:id', upload.single('logo'), projectController.updateProject);

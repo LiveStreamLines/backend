@@ -93,6 +93,11 @@ class DataModel {
         return data.filter(item => item.project === projectId);
     }
 
+    getCameraByProjectTag(projectTag) {
+        const data = this.readData();
+        return data.filter(item => item.projectTag === projectTag);
+    }
+
     findUserByEmailAndPassword(email, password) {
         const data = this.readData();
         return data.find(user => user.email.toLowerCase() === email.toLowerCase() && user.password === password);

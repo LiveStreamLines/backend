@@ -10,6 +10,7 @@ router.get('/', cameraController.getAllCameras);
 router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
 router.get('/:id', cameraController.getCameraById);
 router.get('/proj/:id', cameraController.getCameraByProject);
+router.get('/projtag/:tag', cameraController.getCameraByProjectTag);
 router.post('/', cameraController.addCamera);
 router.put('/:id', cameraController.updateCamera);
 router.delete('/:id', cameraController.deleteCamera);

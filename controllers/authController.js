@@ -11,6 +11,8 @@ function login(req, res) {
     console.log(req.body);
     const user = userData.findUserByEmailAndPassword(email,password);
     console.log(user);
+    const logintime = new Date().toISOString();
+    console.log("login time:", logintime);
     
     if (user) {
       // Check if user is active
@@ -36,6 +38,8 @@ function login(req, res) {
       // const cameraIds = user.accessibleCameras || []; 
       // const services = user.accessibleServices || [];
       
+      const updatedUser = userData.updateItem(user._id, {"LastLoginTime":logintime});
+
   
       res.json({ 
         ... user,

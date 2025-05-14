@@ -20,8 +20,17 @@ function getUserById(req, res) {
 // Controller for adding a new User
 function addUser(req, res) {
     const newUser = req.body;
-    const addedUser = userData.addItem(newUser);
-    res.status(201).json(addedUser);
+    //check if email is new
+    const usercheck = userData.getUserByEmail(req.body.email);
+    console.log(usercheck);
+    
+    if (usercheck.length !== 0) {
+        console.log("email is already there");
+        res.status(500).json({message: "Email is already Registered"});
+    } else {    
+        const addedUser = userData.addItem(newUser);
+        res.status(201).json(addedUser);
+    }
 }
 
 // Controller for updating a User

@@ -82,6 +82,7 @@ function sendResetPasswordLink(req, res) {
   const updateuser =  userData.updateItem(user_id, {
     resetPasswordToken: resetToken,
     resetPasswordExpires: tokenExpiry,
+    status: "Reset Password Sent"
   });
   console.log(user_id);
 
@@ -166,6 +167,7 @@ function resetPassword(req, res) {
       password: hashedPassword,
       resetPasswordToken: null,
       resetPasswordExpires: null,
+      status: "Phone Required"
     });
 
     console.log(updated);

@@ -46,6 +46,7 @@ exports.verifyOtp = (req, res) => {
             user = userData.getItemById(userId);
             if (user) {
                 user.phone = phone; // Associate the phone number
+                user.status = "active";
                 userData.updateItem(userId, user); // Save updated user data
             }
         } else {

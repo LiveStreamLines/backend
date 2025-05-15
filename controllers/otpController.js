@@ -74,6 +74,7 @@ exports.verifyOtp = (req, res) => {
           // const cameraIds = user.accessibleCameras || [];
           // const services = user.accessibleServices || [];
 
+          const logintime = new Date().toISOString();
           const updatedUser = userData.updateItem(user._id, {"LastLoginTime":logintime});
           
 

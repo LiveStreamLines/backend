@@ -43,13 +43,4 @@ testem.log
 Thumbs.db
 
 #data
-/data/cameras.json
-/data/projects.json
-/data/developers.json
-/data/videoRequest.json
-/data/photoRequest.json
-/data/media.json
-/data/users.json
-data/memories.json
-data/inventory.json
-data/deviceType.json
+/data

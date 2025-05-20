@@ -147,7 +147,8 @@ function resetPassword(req, res) {
 
     // Find user by token
     const user = userData.getUserByToken(token);
-    if (!user) {
+   
+    if (user.length === 0) {
       return res.status(400).json({ msg: 'Invalid or expired token' });
     }
 
@@ -159,10 +160,7 @@ function resetPassword(req, res) {
     // Hash the new password
     const hashedPassword = newPassword;
 
-    // Update the user's password and clear the token
-    console.log(user);
-    console.log(user[0]._id);
-
+   
     const updated = userData.updateItem(user[0]._id, {
       password: hashedPassword,
       resetPasswordToken: null,

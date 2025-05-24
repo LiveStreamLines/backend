@@ -27,14 +27,7 @@ const maintenanceController = {
     // Create new maintenance request
     createMaintenance: (req, res) => {
         try {
-            const maintenance = maintenanceData.addItem({
-                dateOfRequest: req.body.dateOfRequest,
-                taskType: req.body.taskType,
-                assignedUser: req.body.assignedUser,
-                userComment: req.body.userComment,
-                status: req.body.status,
-                cameraId: req.body.cameraId
-            });
+            const maintenance = maintenanceData.addItem(req.body);
             res.status(201).json(maintenance);
         } catch (error) {
             res.status(500).json({ message: error.message });

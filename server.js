@@ -22,6 +22,7 @@ const hikTokenRoutes = require('./routes/hikToken');
 const memoryRoutes = require('./routes/memories');
 const invenotryRoutes = require('./routes/inventory');
 const deviceTypeRoutes = require('./routes/deviceType');
+const maintenanceRoutes = require('./routes/maintenance');
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use('/api/tokens', hikTokenRoutes);
 app.use('/api/memories', memoryRoutes);
 app.use('/api/inventory', invenotryRoutes);
 app.use('/api/device-types', deviceTypeRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 const PORT = 5000;
 app.listen(PORT, '0.0.0.0', () => {

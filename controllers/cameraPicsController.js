@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
+const logger = require('../logger');
 
 
 // Define the root directory for camera pictures

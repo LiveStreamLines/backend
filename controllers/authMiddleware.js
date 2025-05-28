@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const logger = require('../logger');
 
 function authMiddleware(req, res, next) {
     // Get the token from the Authorization header

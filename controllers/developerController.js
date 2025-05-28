@@ -1,6 +1,7 @@
 const developerData = require('../models/developerData');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../logger');
 
 
 // Controller for getting all developers

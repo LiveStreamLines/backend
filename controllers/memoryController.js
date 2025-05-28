@@ -1,4 +1,5 @@
 const MemoryData = require('../models/memoryData');
+const logger = require('../logger');
 
 exports.getMemories = (req, res) => {
   res.json(MemoryData.getAllItems());

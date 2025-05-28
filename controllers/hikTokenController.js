@@ -1,4 +1,5 @@
 const hikTokenData = require('../models/hikTokenData');
+const logger = require('../logger');
 
 // Controller for getting all Cameras
 function getTokens(req, res) {

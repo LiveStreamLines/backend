@@ -1,6 +1,8 @@
 // controllers/weatherController.js
 const fs = require('fs');
 const path = require('path');
+const logger = require('../logger');
+
 
 // Controller function to get weather by time
 function getWeatherByTime(req, res) {

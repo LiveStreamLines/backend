@@ -1,6 +1,7 @@
 // controllers/logoController.js
 const fs = require('fs');
 const path = require('path');
+const logger = require('../logger');
 
 // Define the root directory for logos
 const logoRoot = process.env.MEDIA_PATH + '/logos';

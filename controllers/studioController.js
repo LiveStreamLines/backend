@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const logger = require('../logger');
 
 // Controller for saving canvas image
 function saveCanvasImage(req, res) {

@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const mediaData = require('../models/mediaData'); // Assuming a similar structure like developerData.js
+const logger = require('../logger');
 
 // Controller for handling media form submissions
 function handleMediaForm(req, res) {

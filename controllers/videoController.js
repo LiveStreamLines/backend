@@ -7,6 +7,8 @@ const videoRequestData = require('../models/videoRequestData');
 const photoRequestData = require('../models/photoRequestData');
 const developerData = require('../models/developerData');
 const projectData = require('../models/projectData');
+const logger = require('../logger');
+
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
 const batchSize = 200; // Number of images per batch for processing

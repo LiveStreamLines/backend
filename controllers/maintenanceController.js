@@ -1,4 +1,5 @@
 const maintenanceData = require('../models/maintenanceData');
+const logger = require('../logger');
 
 const maintenanceController = {
     // Get all maintenance requests

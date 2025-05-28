@@ -1,4 +1,5 @@
 const inventoryData = require('../models/inventoryData');
+const logger = require('../logger');
 
 module.exports = {
     getAllInventory: function(req, res) {

@@ -1,4 +1,5 @@
 const userData = require('../models/userData');
+const logger = require('../logger');
 
 
 // Controller for getting all Users

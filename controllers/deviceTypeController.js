@@ -1,4 +1,5 @@
 const DeviceTypeData = require('../models/deviceTypeData');
+const logger = require('../logger');
 
 exports.getDeviceType = (req, res) => {
   res.json(DeviceTypeData.getAllItems());

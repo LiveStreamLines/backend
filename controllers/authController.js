@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const sendEmail = require('../utils/email'); // Replace with your email utility
+const logger = require('../logger');
+
 
 
 function login(req, res) {

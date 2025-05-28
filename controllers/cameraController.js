@@ -3,6 +3,7 @@ const path = require('path');
 const cameraData = require('../models/cameraData');
 const developerData = require('../models/developerData');
 const projectData = require("../models/projectData");
+const logger = require('../logger');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
 

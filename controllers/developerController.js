@@ -41,7 +41,7 @@ function addDeveloper(req, res) {
         // Move the uploaded file to the specified directory
         fs.rename(req.file.path, logoFilePath, (err) => {
             if (err) {
-                console.error('Error renaming file:', err); // Log error details
+                logger.error('Error renaming file:', err); // Log error details
                 return res.status(500).json({ message: 'Failed to save logo file' });
             }
             // Add the logo path to the developer data

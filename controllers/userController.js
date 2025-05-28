@@ -22,10 +22,10 @@ function addUser(req, res) {
     const newUser = req.body;
     //check if email is new
     const usercheck = userData.getUserByEmail(req.body.email);
-    console.log(usercheck);
+    logger.info(usercheck);
     
     if (usercheck.length !== 0) {
-        console.log("email is already there");
+        logger.info("email is already there");
         res.status(500).json({message: "Email is already Registered"});
     } else {    
         const addedUser = userData.addItem(newUser);

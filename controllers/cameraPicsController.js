@@ -162,7 +162,7 @@ function generateWeeklyVideo(req, res) {
         });
       })
       .on('error', err => {
-        console.error('Error generating video:', err);
+        logger.error('Error generating video:', err);
 
         // Clean up the temporary directory on error
         if (fs.existsSync(tempDir)) {

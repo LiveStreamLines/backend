@@ -29,7 +29,7 @@ function handleMediaForm(req, res) {
         return new Promise((resolve, reject) => {
             fs.rename(file.path, filePath, (err) => {
                 if (err) {
-                    console.error('Error saving file:', err);
+                    logger.error('Error saving file:', err);
                     reject(err);
                 } else {
                     newMedia.files.push(`files/${fileName}`); // Add file path to the media object
@@ -46,7 +46,7 @@ function handleMediaForm(req, res) {
             res.status(201).json({ ...savedMedia, files: newMedia.files });
         })
         .catch((err) => {
-            console.error('Error processing files:', err);
+            logger.error('Error processing files:', err);
             res.status(500).json({ message: 'Failed to process files.' });
         });
     } else {

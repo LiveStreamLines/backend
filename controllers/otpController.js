@@ -23,7 +23,7 @@ exports.sendOtp = (req, res) => {
       res.status(200).json({ message: 'OTP sent successfully' });
     })
     .catch((err) => {
-      console.error('Error sending OTP:', err);
+      logger.error('Error sending OTP:', err);
       res.status(500).json({ error: 'Failed to send OTP' });
     });
 }
@@ -102,7 +102,7 @@ exports.verifyOtp = (req, res) => {
       }
     })
     .catch((err) => {
-      console.error('Error verifying OTP:', err);
+      logger.error('Error verifying OTP:', err);
       res.status(500).json({ error: 'Failed to verify OTP' });
     });
 };

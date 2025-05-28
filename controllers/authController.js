@@ -8,11 +8,11 @@ const sendEmail = require('../utils/email'); // Replace with your email utility
 
 function login(req, res) {
     const { email, password } = req.body;
-    console.log(req.body);
+    logger.info(req.body);
     const user = userData.findUserByEmailAndPassword(email,password);
-    console.log(user);
+    logger.info(user);
     const logintime = new Date().toISOString();
-    console.log("login time:", logintime);
+    logger.info("login time:", logintime);
     
     if (user) {
       // Check if user is active
@@ -84,7 +84,7 @@ function sendResetPasswordLink(req, res) {
     resetPasswordExpires: tokenExpiry,
     status: "Reset Password Sent"
   });
-  console.log(user_id);
+  logger.info(user_id);
 
   // Create reset link
   const resetLink = `https://lsl-platform.com/reset-password/${resetToken}`;
@@ -131,7 +131,7 @@ function sendResetPasswordLink(req, res) {
   if (email) {
     res.status(200).json({ msg: 'Password reset link sent successfully' });
   } else {
-    console.error('Error in sending reset password link:', error);
+    logger.error('Error in sending reset password link:', error);
     res.status(500).json({ msg: 'An error occurred. Please try again.' });
   }
 
@@ -168,7 +168,7 @@ function resetPassword(req, res) {
       status: "Phone Required"
     });
 
-    console.log(updated);
+    logger.info(updated);
 
     res.status(200).json({ msg: 'Password reset successfully' });
   

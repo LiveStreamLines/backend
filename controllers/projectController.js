@@ -32,8 +32,8 @@ function getProjectByDeveloper(req, res) {
 function getProjectByDeveloperTag(req, res) {
 
     const developer = developerData.getDeveloperByTag(req.params.tag);
-    console.log(req.params.tag);
-    console.log(developer);
+    logger.info(req.params.tag);
+    logger.info(developer);
 
     const project = projectData.getProjectByDeveloperId(developer[0]._id);
     if (project) {
@@ -71,7 +71,7 @@ function addProject(req, res) {
 
         fs.rename(req.file.path, imageFilePath, (err) => {
             if (err) {
-                console.error('Error saving file:', err);
+                logger.error('Error saving file:', err);
                 return res.status(500).json({ message: 'Failed to save file' });
             }
             const final = projectData.updateItem(addedProject._id, { logo: `logos/project/${imageFileName}` });

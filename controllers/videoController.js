@@ -125,7 +125,7 @@ function generateVideoRequest(req, res) {
       filteredImageCount: numFilteredPics,
     });
   } catch (error) {
-    console.error(error);
+    logger.error(error);
     res.status(500).json({ error: error.message });
   }
 }
@@ -171,7 +171,7 @@ function generatePhotoRequest(req, res) {
       filteredImageCount: numFilteredPics,
     });
   } catch (error) {
-    console.error(error);
+    logger.error(error);
     res.status(500).json({ error: error.message });
   }
 }
@@ -187,7 +187,7 @@ function processQueue() {
   const queuedRequest = videoQueue || photoQueue;
 
   if (!queuedRequest) {
-    console.log('No queued requests found.');
+    logger.info('No queued requests found.');
     return; // No queued requests
   }
 
@@ -200,7 +200,7 @@ function processQueue() {
   } else if (queuedRequest.type === 'photo') {
     processPhotoRequest(queuedRequest);
   } else {
-    console.error(`Unknown request type: ${queuedRequest.type}`);
+    logger.error(`Unknown request type: ${queuedRequest.type}`);
     processing = false;
   }
 
@@ -208,7 +208,7 @@ function processQueue() {
 
 function processVideoRequest(queuedRequest) {
   // Update the status to starting
-  console.log(`Starting video generation for request ID: ${queuedRequest._id}`);
+  logger.info(`Starting video generation for request ID: ${queuedRequest._id}`);
   queuedRequest.status = 'starting';
   videoRequestData.updateItem(queuedRequest._id, { status: 'starting' });
 
@@ -237,10 +237,10 @@ function processVideoRequest(queuedRequest) {
 
   processVideoInChunks(requestPayload, (error, videoDetails) => {
     if (error) {
-      console.error(`Video generation failed for request ID: ${requestId}`);
+      logger.error(`Video generation failed for request ID: ${requestId}`);
       videoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
     } else {
-      console.log(`Video generation completed for request ID: ${requestId}`);
+      logger.info(`Video generation completed for request ID: ${requestId}`);
        // Update the request with additional video details
        videoRequestData.updateItem(queuedRequest._id, {
         status: 'ready',
@@ -388,14 +388,14 @@ function processVideoInChunks(payload, callback) {
         '-pix_fmt yuv420p',
       ])
       .output(batchVideoPathl)
-      .on('start', command => console.log(`FFmpeg Command for batch ${batchIndex}:${command}`))
+      .on('start', command => logger.info(`FFmpeg Command for batch ${batchIndex}:${command}`))
       .on('end', () => {
-        console.log(`Processed batch ${batchIndex + 1}/${batchCount}`);
+        logger.info(`Processed batch ${batchIndex + 1}/${batchCount}`);
         fs.unlinkSync(batchListPathl);
         processBatch(batchIndex + 1);
       })
       .on('error', err => {
-        console.error(`Error processing batch ${batchIndex}:`, err);
+        logger.error(`Error processing batch ${batchIndex}:`, err);
         callback(err, null);
       })
       .run();
@@ -451,20 +451,20 @@ function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, musi
         ])
         .output(outputVideoPath)
         .on('start', command => {
-          console.log('FFmpeg command:', command); // Log command for debugging
+          logger.info('FFmpeg command:', command); // Log command for debugging
         })
         .on('end', () => {
           fs.unlinkSync(tempConcatenatedVideoPath); // Clean up temporary video file
           callback(null, { videoPath: outputVideoPath });
         })
         .on('error', err => {
-          console.error('Error adding effects/music:', err);
+          logger.error('Error adding effects/music:', err);
           callback(err, null);
         })
         .run();
     })
     .on('error', err => {
-      console.error('Error concatenating videos:', err);
+      logger.error('Error concatenating videos:', err);
       callback(err, null);
     })
     .run();
@@ -481,14 +481,14 @@ function processPhotoRequest(queuedRequest) {
   const archive = archiver('zip', { zlib: { level: 9 } });
 
   archive.on('error', (err) => {
-    console.error(`Error creating ZIP for request ID: ${requestId}`, err);
+    logger.error(`Error creating ZIP for request ID: ${requestId}`, err);
     photoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
     processing = false;
     processQueue();
   });
 
   output.on('close', () => {
-    console.log(`Photo ZIP created for request ID: ${requestId}, size: ${archive.pointer()} bytes`);
+    logger.info(`Photo ZIP created for request ID: ${requestId}, size: ${archive.pointer()} bytes`);
     photoRequestData.updateItem(queuedRequest._id, { status: 'ready', zipPath: zipFilePath });
     processing = false;
     processQueue();

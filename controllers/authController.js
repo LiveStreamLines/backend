@@ -10,11 +10,11 @@ const logger = require('../logger');
 
 function login(req, res) {
     const { email, password } = req.body;
-    logger.info(req.body);
+    logger.info("request: ", req.body);
     const user = userData.findUserByEmailAndPassword(email,password);
-    logger.info(user);
+    logger.info("info: ", user);
     const logintime = new Date().toISOString();
-    logger.info("login time:", logintime);
+    logger.info("login time: ", logintime);
     
     if (user) {
       // Check if user is active
@@ -86,7 +86,7 @@ function sendResetPasswordLink(req, res) {
     resetPasswordExpires: tokenExpiry,
     status: "Reset Password Sent"
   });
-  logger.info(user_id);
+  logger.info("user: ", user_id);
 
   // Create reset link
   const resetLink = `https://lsl-platform.com/reset-password/${resetToken}`;
@@ -170,7 +170,7 @@ function resetPassword(req, res) {
       status: "Phone Required"
     });
 
-    logger.info(updated);
+    logger.info("updated: ",updated);
 
     res.status(200).json({ msg: 'Password reset successfully' });
   

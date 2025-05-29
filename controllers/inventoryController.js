@@ -61,6 +61,18 @@ module.exports = {
         }
     },
 
+     assignInventoryItemtoUser: function(req, res) {
+        try {
+            const data = inventoryData.assignItemtoUser(req.params.id, req.body);
+            if (!data) {
+                return res.status(404).json({ success: false, message: 'Inventory item not found' });
+            }
+            res.json({ success: true, data });
+        } catch (error) {
+            res.status(400).json({ success: false, message: error.message });
+        }
+    },
+
     unassignInventoryItem: function(req, res) {
         try {
             const data = inventoryData.unassignItem(req.params.id, req.body.reason);

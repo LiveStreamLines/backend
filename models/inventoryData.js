@@ -37,6 +37,37 @@ class InventoryData extends DataModel {
         return updatedItem;
     }
 
+    assignItemtoUser(itemId, assignmentData) {
+        const items = this.readData();
+        const index = items.findIndex(item => item._id === itemId);
+        
+        if (index === -1) return null;
+
+        // If currently assigned, move to history
+        if (items[index].currentAssignment) {
+            items[index].assignmentHistory = items[index].assignmentHistory || [];
+            items[index].assignmentHistory.push({
+                ...items[index].currentAssignment,
+                removedDate: new Date().toISOString(),
+                removalReason: 'Reassigned To User'
+            });
+        }
+
+        // Create new assignment
+        const updatedItem = {
+            ...items[index],
+            currentAssignment: {
+                ...assignmentData,
+                assignedDate: new Date().toISOString()
+            },
+            status: 'user_assigned'
+        };
+
+        items[index] = updatedItem;
+        this.writeData(items);
+        return updatedItem;
+    }
+
     // Custom method to unassign an inventory item
     unassignItem(itemId, reason) {
         const items = this.readData();

@@ -113,7 +113,7 @@ class InventoryData extends DataModel {
                     removalReason: reason
                 }
             ],
-            currentAssignment: null,
+            currentUserAssignment: null,
             status: 'available'
         };
 

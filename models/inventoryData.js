@@ -44,9 +44,9 @@ class InventoryData extends DataModel {
         if (index === -1) return null;
 
         // If currently assigned, move to history
-        if (items[index].currentAssignment) {
-            items[index].assignmentHistory = items[index].assignmentHistory || [];
-            items[index].assignmentHistory.push({
+        if (items[index].currentUserAssignment) {
+            items[index].userAssignmentHistory = items[index].userAssignmentHistory || [];
+            items[index].userAssignmentHistory.push({
                 ...items[index].currentAssignment,
                 removedDate: new Date().toISOString(),
                 removalReason: 'Reassigned To User'
@@ -56,7 +56,7 @@ class InventoryData extends DataModel {
         // Create new assignment
         const updatedItem = {
             ...items[index],
-            currentAssignment: {
+            currentUserAssignment: {
                 ...assignmentData,
                 assignedDate: new Date().toISOString()
             },

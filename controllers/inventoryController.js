@@ -88,6 +88,21 @@ module.exports = {
         }
     },
 
+    unassignUserInventoryItem: function(req, res) {
+        try {
+            const data = inventoryData.unassignUserItem(req.params.id, req.body.reason);
+            if (!data) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Inventory item not found or not assigned' 
+                });
+            }
+            res.json({ success: true, data });
+        } catch (error) {
+            res.status(400).json({ success: false, message: error.message });
+        }
+    },
+
     getInventoryByDeveloper: function(req, res) {
         try {
             const data = inventoryData.getItemsByDeveloperId(req.params.developerId);

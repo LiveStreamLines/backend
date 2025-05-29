@@ -95,6 +95,35 @@ class InventoryData extends DataModel {
         return updatedItem;
     }
 
+    // Custom method to unassign an inventory item
+    unassignUserItem(itemId, reason) {
+        const items = this.readData();
+        const index = items.findIndex(item => item._id === itemId);
+        
+        if (index === -1 || !items[index].currentUserAssignment) return null;
+
+        // Move current assignment to history
+        const updatedItem = {
+            ...items[index],
+            userAssignmentHistory: [
+                ...(items[index].userAssignmentHistory || []),
+                {
+                    ...items[index].currentUserAssignment,
+                    removedDate: new Date().toISOString(),
+                    removalReason: reason
+                }
+            ],
+            currentAssignment: null,
+            status: 'available'
+        };
+
+        items[index] = updatedItem;
+        this.writeData(items);
+        return updatedItem;
+    }
+
+
+
     // Get items assigned to a developer
     getItemsByDeveloperId(developerId) {
         const items = this.readData();
@@ -112,6 +141,16 @@ class InventoryData extends DataModel {
             item.currentAssignment.project._id === projectId
         );
     }
+
+     // Get items assigned to a user
+    getItemsByUserId(userId) {
+        const items = this.readData();
+        return items.filter(item => 
+            item.currentUserAssignment && 
+            item.currentUserAssignment.userId === userId
+        );
+    }
+    
 }
 
 module.exports = new InventoryData();

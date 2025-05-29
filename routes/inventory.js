@@ -12,7 +12,7 @@ router.post('/', inventoryController.createInventory);
 router.get('/:id', inventoryController.getInventoryById);
 router.put('/:id', inventoryController.updateInventory);
 router.patch('/assign/:id', inventoryController.assignInventoryItem);
-router.patch('/assign-user/:id', inventoryController.assignInventoryItemtoUser);
+router.patch('/unassign-user/:id', inventoryController.assignInventoryItemtoUser);
 router.patch('/unassign/:id', inventoryController.unassignInventoryItem);
 //router.patch('/:id/retire', inventoryController.);
 

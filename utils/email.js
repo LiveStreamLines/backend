@@ -1,4 +1,6 @@
 const nodemailer = require('nodemailer');
+const logger = require('../logger');
+
 const sendEmail = async (to, subject, html) => {
     try {
       // Create transporter using SMTP

@@ -125,8 +125,8 @@ module.exports = {
         try {
             const data = inventoryData.getItemsBySerial(req.params.serial);
             console.log(data);
-            if (data.currentAssignment) {
-                res.json({ success: true, data });
+            if (data.length > 0 && data[0].currentAssignment) {
+                res.json({ success: true, data: data[0] });
             } else {
                 res.json({error: "the serial is not assigned"});
             }

@@ -1,4 +1,9 @@
 const inventoryData = require('../models/inventoryData');
+const developData = require('../models/developerData');
+const projectData = require('../models/projectData');
+const cameraData = require('../models/cameraData');
+
+
 const logger = require('../logger');
 
 module.exports = {
@@ -126,7 +131,11 @@ module.exports = {
             const data = inventoryData.getItemsBySerial(req.params.serial);
             console.log(data);
             if (data.length > 0 && data[0].currentAssignment) {
-                res.json({ success: true, data: data[0] });
+                const assignment = data[0].currentAssignment;
+                const developer = developData.getItemById(assignment.developer);
+                const project = projectData.getItemById(assignment.project);
+                const camera = cameraData.getItemById(assignment.camera);
+                res.json({ success: true, data: {developer: developer.developerTag, project: project.projectTag, camera: camera.name} });
             } else {
                 res.json({error: "the serial is not assigned"});
             }

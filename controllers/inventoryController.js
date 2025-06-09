@@ -135,9 +135,9 @@ module.exports = {
                 const developer = developData.getItemById(assignment.developer);
                 const project = projectData.getItemById(assignment.project);
                 const camera = cameraData.getItemById(assignment.camera);
-                res.json({ success: true, data: {developer: developer.developerTag, project: project.projectTag, camera: camera.name} });
+                res.json({ success: true, data: {developer: developer.developerTag, project: project.projectTag, camera: camera.camera} });
             } else {
-                res.json({error: "the serial is not assigned"});
+                res.json({error: "the serial either not registred or not assigned"});
             }
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });

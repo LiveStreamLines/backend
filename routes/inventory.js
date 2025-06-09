@@ -10,6 +10,7 @@ const inventoryController = require('../controllers/inventoryController');
 router.get('/', inventoryController.getAllInventory);
 router.post('/', inventoryController.createInventory);
 router.get('/:id', inventoryController.getInventoryById);
+router.get('/serial/:serial', inventoryController.getInventoryAsssignation);
 router.put('/:id', inventoryController.updateInventory);
 router.patch('/assign/:id', inventoryController.assignInventoryItem);
 router.patch('/assign-user/:id', inventoryController.assignInventoryItemtoUser);

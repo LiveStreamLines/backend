@@ -142,6 +142,15 @@ class InventoryData extends DataModel {
         );
     }
 
+    // Get items assigned to a project
+    getItemsBySerial(serial) {
+        const items = this.readData();
+        return items.filter(item => 
+           item.device.serialNumber === serial
+        );
+    }
+
+
      // Get items assigned to a user
     getItemsByUserId(userId) {
         const items = this.readData();

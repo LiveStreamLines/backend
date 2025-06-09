@@ -119,5 +119,18 @@ module.exports = {
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });
         }
+    },
+
+    getInventoryAsssignation: function(req, res) {
+        try {
+            const data = inventoryData.getItemsBySerial(req.params.serial);
+            if (data.currentAssignment) {
+                res.json({ success: true, data });
+            } else {
+                res.json({error: "the serial is not assigned"});
+            }
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
     }
 };

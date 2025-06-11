@@ -1,4 +1,9 @@
 const inventoryData = require('../models/inventoryData');
+const developData = require('../models/developerData');
+const projectData = require('../models/projectData');
+const cameraData = require('../models/cameraData');
+
+
 const logger = require('../logger');
 
 module.exports = {
@@ -116,6 +121,24 @@ module.exports = {
         try {
             const data = inventoryData.getItemsByProjectId(req.params.projectId);
             res.json({ success: true, data });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+
+    getInventoryAsssignation: function(req, res) {
+        try {
+            const data = inventoryData.getItemsBySerial(req.params.serial);
+            console.log(data);
+            if (data.length > 0 && data[0].currentAssignment) {
+                const assignment = data[0].currentAssignment;
+                const developer = developData.getItemById(assignment.developer);
+                const project = projectData.getItemById(assignment.project);
+                const camera = cameraData.getItemById(assignment.camera);
+                res.json({ success: true, data: {developer: developer.developerTag, project: project.projectTag, camera: camera.camera} });
+            } else {
+                res.json({error: "the serial either not registred or not assigned"});
+            }
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });
         }

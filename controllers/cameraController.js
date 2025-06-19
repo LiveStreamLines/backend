@@ -34,6 +34,15 @@ function getCameraByProject(req, res) {
     }
 }
 
+function getCameraByDeveloperId(req, res) {
+    const camera = cameraData.getCameraByDeveloperId(req.params.id);
+    if (camera) {
+        res.json(camera);
+    } else {
+        res.status(404).json({ message: 'Camera not found' });
+    }
+}
+
 function getCameraByProjectTag(req, res) {
     const project = projectData.getProjectByTag(req.params.tag);
     const camera = cameraData.getCameraByProjectId(project[0]._id);
@@ -155,6 +164,7 @@ module.exports = {
     getCameraById,
     getCameraByProject,
     getCameraByProjectTag,
+    getCameraByDeveloperId,
     addCamera,
     updateCamera,
     deleteCamera

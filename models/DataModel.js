@@ -93,6 +93,11 @@ class DataModel {
         return data.filter(item => item.project === projectId);
     }
 
+    getCameraByDeveloperId(developerId) {
+        const data = this.readData();
+        return data.filter(item => item.developer === developerId);
+    }
+
     getCameraByProjectTag(projectTag) {
         const data = this.readData();
         return data.filter(item => item.projectTag === projectTag);

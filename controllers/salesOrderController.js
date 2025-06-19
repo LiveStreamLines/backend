@@ -30,27 +30,22 @@ const salesOrderController = {
     // Create new sales order
     createSalesOrder: (req, res) => {
         try {
-            const salesOrderData = {
-                customerId: req.body.customerId,
-                customerName: req.body.customerName,
-                contractStartDate: req.body.contractStartDate,
-                contractEndDate: req.body.contractEndDate,
-                contractDuration: req.body.contractDuration,
-                monthlyFee: req.body.monthlyFee,
-                totalContractValue: req.body.totalContractValue,
-                status: 'Draft',
-                cameras: req.body.cameras || [],
-                paymentSchedule: generatePaymentSchedule(
-                    req.body.contractStartDate,
-                    req.body.contractDuration,
-                    req.body.monthlyFee
-                ),
-                billingAddress: req.body.billingAddress,
-                contactPerson: req.body.contactPerson,
-                notes: req.body.notes
+            // Accept all fields from the request body
+            const order = {
+                ...req.body,
+                status: req.body.status || 'Draft',
             };
 
-            const newSalesOrder = salesOrderData.addItem(salesOrderData);
+            // If paymentSchedule is not provided, generate it
+            if (!order.paymentSchedule && order.contractStartDate && order.contractDuration && order.monthlyFee) {
+                order.paymentSchedule = generatePaymentSchedule(
+                    order.contractStartDate,
+                    order.contractDuration,
+                    order.monthlyFee
+                );
+            }
+
+            const newSalesOrder = salesOrderData.addItem(order);
             res.status(201).json(newSalesOrder);
         } catch (error) {
             logger.error('Error creating sales order:', error);
@@ -61,6 +56,7 @@ const salesOrderController = {
     // Update sales order
     updateSalesOrder: (req, res) => {
         try {
+            // Accept all fields from the request body
             const updatedSalesOrder = salesOrderData.updateItem(req.params.id, req.body);
             if (!updatedSalesOrder) {
                 return res.status(404).json({ message: 'Sales order not found' });

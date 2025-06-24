@@ -32,30 +32,25 @@ function getProjectById(req, res) {
 
 // Controller for getting projects in Developer
 function getProjectByDeveloper(req, res) {
-    try {
-        const projects = projectData.getProjectByDeveloperId(req.params.id);
-        res.json(projects || []);
-    } catch (error) {
-        logger.error('Error getting projects by developer:', error);
-        res.status(500).json({ message: error.message });
+    const project = projectData.getProjectByDeveloperId(req.params.id);
+    if (project) {
+        res.json(project);
+    } else {
+        res.status(404).json({ message: 'Project not found' });
     }
 }
 
 function getProjectByDeveloperTag(req, res) {
-    try {
-        const developer = developerData.getDeveloperByTag(req.params.tag);
-        logger.info(req.params.tag);
-        logger.info(developer);
 
-        if (!developer || developer.length === 0) {
-            return res.json([]);
-        }
+    const developer = developerData.getDeveloperByTag(req.params.tag);
+    logger.info(req.params.tag);
+    logger.info(developer);
 
-        const projects = projectData.getProjectByDeveloperId(developer[0]._id);
-        res.json(projects || []);
-    } catch (error) {
-        logger.error('Error getting projects by developer tag:', error);
-        res.status(500).json({ message: error.message });
+    const project = projectData.getProjectByDeveloperId(developer[0]._id);
+    if (project) {
+        res.json(project);
+    } else {
+        res.status(404).json({ message: 'Project not found' });
     }
 }
 
@@ -154,46 +149,28 @@ function getProjectsByDeveloper(req, res) {
 function getAvailableProjectsForSalesOrder(req, res) {
     try {
         const developerId = req.params.developerId;
-        logger.info(`Getting available projects for developer: ${developerId}`);
         
         // Get all projects for this developer
         const allProjects = projectData.getItemsByDeveloper(developerId);
-        logger.info(`Found ${allProjects.length} total projects for developer ${developerId}:`, allProjects);
         
         // Get all sales orders to check which projects are already associated
         const allSalesOrders = salesOrderData.getAllItems();
-        logger.info(`Found ${allSalesOrders.length} total sales orders`);
         
         // Filter projects that are available for sales orders
         const availableProjects = allProjects.filter(project => {
-            logger.info(`Checking project: ${project.projectName} (ID: ${project._id})`);
-            logger.info(`Project status: ${project.status}`);
-            
             // Check if project status is "new"
             if (project.status !== 'new') {
-                logger.info(`Project ${project.projectName} filtered out - status is not 'new' (status: ${project.status})`);
                 return false;
             }
             
             // Check if project is not already associated with any sales order
-            const hasSalesOrder = allSalesOrders.some(salesOrder => {
-                const isAssociated = salesOrder.projectId === project._id;
-                if (isAssociated) {
-                    logger.info(`Project ${project.projectName} is already associated with sales order: ${salesOrder.orderNumber}`);
-                }
-                return isAssociated;
-            });
+            const hasSalesOrder = allSalesOrders.some(salesOrder => 
+                salesOrder.projectId === project._id
+            );
             
-            if (hasSalesOrder) {
-                logger.info(`Project ${project.projectName} filtered out - already has sales order`);
-                return false;
-            }
-            
-            logger.info(`Project ${project.projectName} is available for sales order`);
-            return true;
+            return !hasSalesOrder;
         });
         
-        logger.info(`Returning ${availableProjects.length} available projects:`, availableProjects);
         res.json(availableProjects);
     } catch (error) {
         logger.error('Error getting available projects for sales order:', error);

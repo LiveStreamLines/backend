@@ -9,7 +9,7 @@ class DataModel {
     // Helper function to read data from JSON file
     readData() {
         if (!fs.existsSync(this.filePath)) {
-            return [];
+            return [this.filePath];
         }
         const data = fs.readFileSync(this.filePath);
         return JSON.parse(data);

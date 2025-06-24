@@ -24,11 +24,11 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.get('/', projectController.getAllProjects);
-router.get('/:id', projectController.getProjectById);
+router.get('/available-for-sales-order/:developerId', projectController.getAvailableProjectsForSalesOrder);
 router.get('/dev/:id', projectController.getProjectByDeveloper);
 router.get('/devTag/:tag', projectController.getProjectByDeveloperTag);
 router.get('/tag/:tag', projectController.getProjectByTag);
-router.get('/available-for-sales-order/:developerId', projectController.getAvailableProjectsForSalesOrder);
+router.get('/:id', projectController.getProjectById);
 router.post('/', upload.single('logo'),projectController.addProject);
 router.put('/:id', upload.single('logo'), projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);

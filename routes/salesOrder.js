@@ -7,6 +7,8 @@ router.use(authMiddleware);
 
 // Get all sales orders
 router.get('/', salesOrderController.getAllSalesOrders);
+// Get next order number
+router.get('/next-number', salesOrderController.generateNextOrderNumber);
 // Get sales order by ID
 router.get('/:id', salesOrderController.getSalesOrderById);
 // Create new sales order

@@ -86,6 +86,17 @@ const salesOrderController = {
             logger.error('Error getting sales orders by customer:', error);
             res.status(500).json({ message: error.message });
         }
+    },
+
+    // Generate next order number
+    generateNextOrderNumber: (req, res) => {
+        try {
+            const nextNumber = salesOrderData.generateOrderNumber();
+            res.json({ nextNumber });
+        } catch (error) {
+            logger.error('Error generating next order number:', error);
+            res.status(500).json({ message: error.message });
+        }
     }
 };
 

@@ -1,4 +1,5 @@
 const salesOrderData = require('../models/salesOrderData');
+const cameraData = require('../models/cameraData');
 const logger = require('../logger');
 
 const salesOrderController = {
@@ -39,6 +40,40 @@ const salesOrderController = {
             };
 
             console.log('Processed order data:', order);
+
+            // Create camera records if cameras are provided
+            if (order.cameras && Array.isArray(order.cameras) && order.cameras.length > 0) {
+                const createdCameras = [];
+                
+                for (const cameraInfo of order.cameras) {
+                    // Create camera record
+                    const newCameraData = {
+                        camera: cameraInfo.cameraName,
+                        cameraId: cameraInfo.cameraId,
+                        project: order.projectId,
+                        developer: order.customerId,
+                        projectTag: order.projectName,
+                        developerTag: order.customerName,
+                        status: 'Pending',
+                        installedDate: null, // Will be set later when camera is installed
+                        monthlyFee: cameraInfo.monthlyFee,
+                        contractDuration: cameraInfo.contractDuration,
+                        serverFolder: cameraInfo.cameraId, // Using cameraId as server folder
+                        isActive: true,
+                        createdDate: new Date().toISOString()
+                    };
+                    
+                    const createdCamera = cameraData.addItem(newCameraData);
+                    createdCameras.push(createdCamera);
+                    
+                    // Update the camera info in the sales order with the generated camera ID
+                    cameraInfo.cameraId = createdCamera._id;
+                    
+                    logger.info(`Created camera record: ${createdCamera.camera} (ID: ${createdCamera._id})`);
+                }
+                
+                logger.info(`Created ${createdCameras.length} camera records for sales order`);
+            }
 
             const newSalesOrder = salesOrderData.addItem(order);
             res.status(201).json(newSalesOrder);
@@ -107,7 +142,7 @@ const salesOrderController = {
         } catch (error) {
             logger.error('Error generating next invoice number:', error);
             res.status(500).json({ message: error.message });
-    }
+        }
     }
 };
 

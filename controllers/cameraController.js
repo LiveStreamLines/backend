@@ -148,6 +148,33 @@ function updateCamera(req, res) {
     }
 }
 
+// Controller for updating camera installation date
+function updateCameraInstallationDate(req, res) {
+    try {
+        const { installedDate } = req.body;
+        
+        if (!installedDate) {
+            return res.status(400).json({ message: 'Installed date is required' });
+        }
+
+        const updateData = {
+            installedDate: new Date(installedDate).toISOString(),
+            status: 'Installed'
+        };
+
+        const updatedCamera = cameraData.updateItem(req.params.id, updateData);
+        if (updatedCamera) {
+            logger.info(`Updated camera installation date: ${updatedCamera.camera} (ID: ${updatedCamera._id})`);
+            res.json(updatedCamera);
+        } else {
+            res.status(404).json({ message: 'Camera not found' });
+        }
+    } catch (error) {
+        logger.error('Error updating camera installation date:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 // Controller for deleting a Camera
 function deleteCamera(req, res) {
     const isDeleted = cameraData.deleteItem(req.params.id);
@@ -167,5 +194,6 @@ module.exports = {
     getCameraByDeveloperId,
     addCamera,
     updateCamera,
+    updateCameraInstallationDate,
     deleteCamera
 };

@@ -107,7 +107,7 @@ const salesOrderController = {
         } catch (error) {
             logger.error('Error generating next invoice number:', error);
             res.status(500).json({ message: error.message });
-        }
+    }
     }
 };
 

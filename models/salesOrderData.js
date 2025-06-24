@@ -63,10 +63,33 @@ class SalesOrderData extends DataModel {
 
     generateOrderNumber() {
         const date = new Date();
-        const year = date.getFullYear().toString().slice(-2);
+        const year = date.getFullYear();
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        return `SO-${year}${month}-${random}`;
+        const yearMonth = `${year}-${month}`;
+        
+        const items = this.readData();
+        
+        // Find the highest serial number for this year-month combination
+        let maxSerial = 0;
+        items.forEach(item => {
+            if (item.orderNumber) {
+                const match = item.orderNumber.match(new RegExp(`^SO-${year}-${month}-(\\d{4})$`));
+                if (match) {
+                    const serial = parseInt(match[1], 10);
+                    if (serial > maxSerial) {
+                        maxSerial = serial;
+                    }
+                }
+            }
+        });
+        
+        // Generate next serial number (0001 to 9999)
+        const nextSerial = Math.min(maxSerial + 1, 9999);
+        const serialStr = nextSerial.toString().padStart(4, '0');
+        
+        const orderNumber = `SO-${year}-${month}-${serialStr}`;
+        logger.info(`Generated order number: ${orderNumber} (serial: ${serialStr})`);
+        return orderNumber;
     }
 
     generateInvoiceNumber() {

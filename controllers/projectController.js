@@ -3,44 +3,59 @@ const developerData = require('../models/developerData'); // To validate develop
 const path = require('path');
 const fs = require('fs');
 const logger = require('../logger');
+const salesOrderData = require('../models/salesOrderData');
 
 /// Controller for getting all projects
 function getAllProjects(req, res) {
-    const projects = projectData.getAllItems();
-    res.json(projects);
+    try {
+        const projects = projectData.getAllItems();
+        res.json(projects);
+    } catch (error) {
+        logger.error('Error getting all projects:', error);
+        res.status(500).json({ message: error.message });
+    }
 }
 
 // Controller for getting a single project by ID
 function getProjectById(req, res) {
-    const project = projectData.getItemById(req.params.id);
-    if (project) {
+    try {
+        const project = projectData.getItemById(req.params.id);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
         res.json(project);
-    } else {
-        res.status(404).json({ message: 'Project not found' });
+    } catch (error) {
+        logger.error('Error getting project by ID:', error);
+        res.status(500).json({ message: error.message });
     }
 }
 
 // Controller for getting projects in Developer
 function getProjectByDeveloper(req, res) {
-    const project = projectData.getProjectByDeveloperId(req.params.id);
-    if (project) {
-        res.json(project);
-    } else {
-        res.status(404).json({ message: 'Project not found' });
+    try {
+        const projects = projectData.getProjectByDeveloperId(req.params.id);
+        res.json(projects || []);
+    } catch (error) {
+        logger.error('Error getting projects by developer:', error);
+        res.status(500).json({ message: error.message });
     }
 }
 
 function getProjectByDeveloperTag(req, res) {
+    try {
+        const developer = developerData.getDeveloperByTag(req.params.tag);
+        logger.info(req.params.tag);
+        logger.info(developer);
 
-    const developer = developerData.getDeveloperByTag(req.params.tag);
-    logger.info(req.params.tag);
-    logger.info(developer);
+        if (!developer || developer.length === 0) {
+            return res.json([]);
+        }
 
-    const project = projectData.getProjectByDeveloperId(developer[0]._id);
-    if (project) {
-        res.json(project);
-    } else {
-        res.status(404).json({ message: 'Project not found' });
+        const projects = projectData.getProjectByDeveloperId(developer[0]._id);
+        res.json(projects || []);
+    } catch (error) {
+        logger.error('Error getting projects by developer tag:', error);
+        res.status(500).json({ message: error.message });
     }
 }
 
@@ -112,11 +127,77 @@ function updateProject(req, res) {
 
 // Controller for deleting a Project
 function deleteProject(req, res) {
-    const isDeleted = projectData.deleteItem(req.params.id);
-    if (isDeleted) {
-        res.status(204).send();
-    } else {
-        res.status(404).json({ message: 'Project not found' });
+    try {
+        const success = projectData.deleteItem(req.params.id);
+        if (!success) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+        res.json({ message: 'Project deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting project:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+// Get projects by developer
+function getProjectsByDeveloper(req, res) {
+    try {
+        const projects = projectData.getItemsByDeveloper(req.params.developerId);
+        res.json(projects);
+    } catch (error) {
+        logger.error('Error getting projects by developer:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+// Get available projects for sales orders (status "new" and no sales orders associated)
+function getAvailableProjectsForSalesOrder(req, res) {
+    try {
+        const developerId = req.params.developerId;
+        logger.info(`Getting available projects for developer: ${developerId}`);
+        
+        // Get all projects for this developer
+        const allProjects = projectData.getItemsByDeveloper(developerId);
+        logger.info(`Found ${allProjects.length} total projects for developer ${developerId}:`, allProjects);
+        
+        // Get all sales orders to check which projects are already associated
+        const allSalesOrders = salesOrderData.getAllItems();
+        logger.info(`Found ${allSalesOrders.length} total sales orders`);
+        
+        // Filter projects that are available for sales orders
+        const availableProjects = allProjects.filter(project => {
+            logger.info(`Checking project: ${project.projectName} (ID: ${project._id})`);
+            logger.info(`Project status: ${project.status}`);
+            
+            // Check if project status is "new"
+            if (project.status !== 'new') {
+                logger.info(`Project ${project.projectName} filtered out - status is not 'new' (status: ${project.status})`);
+                return false;
+            }
+            
+            // Check if project is not already associated with any sales order
+            const hasSalesOrder = allSalesOrders.some(salesOrder => {
+                const isAssociated = salesOrder.projectId === project._id;
+                if (isAssociated) {
+                    logger.info(`Project ${project.projectName} is already associated with sales order: ${salesOrder.orderNumber}`);
+                }
+                return isAssociated;
+            });
+            
+            if (hasSalesOrder) {
+                logger.info(`Project ${project.projectName} filtered out - already has sales order`);
+                return false;
+            }
+            
+            logger.info(`Project ${project.projectName} is available for sales order`);
+            return true;
+        });
+        
+        logger.info(`Returning ${availableProjects.length} available projects:`, availableProjects);
+        res.json(availableProjects);
+    } catch (error) {
+        logger.error('Error getting available projects for sales order:', error);
+        res.status(500).json({ message: error.message });
     }
 }
 
@@ -128,5 +209,7 @@ module.exports = {
     getProjectByTag,
     addProject,
     updateProject,
-    deleteProject
+    deleteProject,
+    getProjectsByDeveloper,
+    getAvailableProjectsForSalesOrder
 };

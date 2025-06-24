@@ -68,6 +68,31 @@ class SalesOrderData extends DataModel {
         const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
         return `SO-${year}${month}-${random}`;
     }
+
+    generateInvoiceNumber() {
+        const items = this.readData();
+        const currentYear = new Date().getFullYear();
+        
+        // Find the highest invoice sequence number across all sales orders
+        let maxSequence = 0;
+        
+        items.forEach(salesOrder => {
+            if (salesOrder.invoices && Array.isArray(salesOrder.invoices)) {
+                salesOrder.invoices.forEach(invoice => {
+                    if (invoice.invoiceSequence && invoice.invoiceSequence > maxSequence) {
+                        maxSequence = invoice.invoiceSequence;
+                    }
+                });
+            }
+        });
+        
+        // Generate next sequence number
+        const nextSequence = maxSequence + 1;
+        const invoiceNumber = `INV-${currentYear}-${nextSequence.toString().padStart(4, '0')}`;
+        
+        logger.info(`Generated invoice number: ${invoiceNumber} (sequence: ${nextSequence})`);
+        return invoiceNumber;
+    }
 }
 
 module.exports = new SalesOrderData(); 

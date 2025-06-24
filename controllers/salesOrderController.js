@@ -97,6 +97,17 @@ const salesOrderController = {
             logger.error('Error generating next order number:', error);
             res.status(500).json({ message: error.message });
         }
+    },
+
+    // Generate next invoice number
+    generateNextInvoiceNumber: (req, res) => {
+        try {
+            const nextNumber = salesOrderData.generateInvoiceNumber();
+            res.json({ nextNumber });
+        } catch (error) {
+            logger.error('Error generating next invoice number:', error);
+            res.status(500).json({ message: error.message });
+        }
     }
 };
 

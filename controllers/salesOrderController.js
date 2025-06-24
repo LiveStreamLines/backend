@@ -30,20 +30,15 @@ const salesOrderController = {
     // Create new sales order
     createSalesOrder: (req, res) => {
         try {
+            console.log('Received sales order data:', req.body);
+            
             // Accept all fields from the request body
             const order = {
                 ...req.body,
                 status: req.body.status || 'Draft',
             };
 
-            // If paymentSchedule is not provided, generate it
-            if (!order.paymentSchedule && order.contractStartDate && order.contractDuration && order.monthlyFee) {
-                order.paymentSchedule = generatePaymentSchedule(
-                    order.contractStartDate,
-                    order.contractDuration,
-                    order.monthlyFee
-                );
-            }
+            console.log('Processed order data:', order);
 
             const newSalesOrder = salesOrderData.addItem(order);
             res.status(201).json(newSalesOrder);
@@ -93,24 +88,5 @@ const salesOrderController = {
         }
     }
 };
-
-// Helper function to generate payment schedule
-function generatePaymentSchedule(startDate, duration, monthlyFee) {
-    const schedule = [];
-    const start = new Date(startDate);
-    
-    for (let i = 0; i < duration; i++) {
-        const dueDate = new Date(start);
-        dueDate.setMonth(start.getMonth() + i);
-        
-        schedule.push({
-            dueDate: dueDate.toISOString(),
-            amount: monthlyFee,
-            status: 'Pending'
-        });
-    }
-    
-    return schedule;
-}
 
 module.exports = salesOrderController; 

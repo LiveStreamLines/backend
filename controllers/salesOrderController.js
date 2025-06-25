@@ -41,19 +41,45 @@ const salesOrderController = {
 
             console.log('Processed order data:', order);
 
-            // Create camera records if cameras are provided
-            if (order.cameras && Array.isArray(order.cameras) && order.cameras.length > 0) {
+            // Cameras will be created when the sales order is confirmed
+            // No camera creation here for Draft orders
+
+            const newSalesOrder = salesOrderData.addItem(order);
+            res.status(201).json(newSalesOrder);
+        } catch (error) {
+            logger.error('Error creating sales order:', error);
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // Update sales order
+    updateSalesOrder: (req, res) => {
+        try {
+            const salesOrderId = req.params.id;
+            const updateData = req.body;
+            
+            // Get the current sales order to check status changes
+            const currentSalesOrder = salesOrderData.getItemById(salesOrderId);
+            if (!currentSalesOrder) {
+                return res.status(404).json({ message: 'Sales order not found' });
+            }
+
+            // Check if status is changing to 'Confirmed' and cameras need to be created
+            if (updateData.status === 'Confirmed' && currentSalesOrder.status === 'Draft' && 
+                currentSalesOrder.cameras && Array.isArray(currentSalesOrder.cameras) && currentSalesOrder.cameras.length > 0) {
+                
+                logger.info(`Creating camera records for confirmed sales order: ${salesOrderId}`);
                 const createdCameras = [];
                 
-                for (const cameraInfo of order.cameras) {
+                for (const cameraInfo of currentSalesOrder.cameras) {
                     // Create camera record
                     const newCameraData = {
                         camera: cameraInfo.cameraName,
                         cameraId: cameraInfo.cameraId,
-                        project: order.projectId,
-                        developer: order.customerId,
-                        projectTag: order.projectName,
-                        developerTag: order.customerName,
+                        project: currentSalesOrder.projectId,
+                        developer: currentSalesOrder.customerId,
+                        projectTag: currentSalesOrder.projectTag || currentSalesOrder.projectName,
+                        developerTag: currentSalesOrder.developerTag || currentSalesOrder.customerName,
                         status: 'Pending',
                         installedDate: null, // Will be set later when camera is installed
                         monthlyFee: cameraInfo.monthlyFee,
@@ -72,22 +98,14 @@ const salesOrderController = {
                     logger.info(`Created camera record: ${createdCamera.camera} (ID: ${createdCamera._id})`);
                 }
                 
-                logger.info(`Created ${createdCameras.length} camera records for sales order`);
+                logger.info(`Created ${createdCameras.length} camera records for confirmed sales order`);
+                
+                // Update the cameras array in the update data with the new camera IDs
+                updateData.cameras = currentSalesOrder.cameras;
             }
 
-            const newSalesOrder = salesOrderData.addItem(order);
-            res.status(201).json(newSalesOrder);
-        } catch (error) {
-            logger.error('Error creating sales order:', error);
-            res.status(500).json({ message: error.message });
-        }
-    },
-
-    // Update sales order
-    updateSalesOrder: (req, res) => {
-        try {
             // Accept all fields from the request body
-            const updatedSalesOrder = salesOrderData.updateItem(req.params.id, req.body);
+            const updatedSalesOrder = salesOrderData.updateItem(salesOrderId, updateData);
             if (!updatedSalesOrder) {
                 return res.status(404).json({ message: 'Sales order not found' });
             }

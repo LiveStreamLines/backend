@@ -64,6 +64,26 @@ function getLastPicturesFromAllCameras(req, res) {
     const lastPictures = cameras.map(camera => {
         const project = projectData.getItemById(camera.project);
         const developer = developerData.getItemById(camera.developer);
+        
+        // Check if project and developer exist
+        if (!project) {
+            return { 
+                FullName: `Unknown Project/${camera.camera}(${camera.serverFolder || 'Unknown'})`, 
+                error: 'Project not found',
+                cameraId: camera._id,
+                projectId: camera.project
+            };
+        }
+        
+        if (!developer) {
+            return { 
+                FullName: `${project.projectTag || 'Unknown'}/${camera.camera}(${camera.serverFolder || 'Unknown'})`, 
+                error: 'Developer not found',
+                cameraId: camera._id,
+                developerId: camera.developer
+            };
+        }
+        
         const projectTag = project.projectTag;
         const developerTag = developer.developerTag;
         const projectId = project._id;

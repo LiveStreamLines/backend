@@ -195,6 +195,76 @@ function updateCameraInstallationDate(req, res) {
     }
 }
 
+// Controller for updating camera invoice information
+function updateCameraInvoiceInfo(req, res) {
+    try {
+        const { invoiceNumber, invoiceSequence, amount, duration, generatedDate, status } = req.body;
+        
+        if (!invoiceNumber || !invoiceSequence || !amount || !duration) {
+            return res.status(400).json({ message: 'Invoice information is required' });
+        }
+
+        const camera = cameraData.getItemById(req.params.id);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        // Add the new invoice to the camera's invoices array
+        const newInvoice = {
+            invoiceNumber,
+            invoiceSequence,
+            amount,
+            duration,
+            generatedDate: new Date(generatedDate).toISOString(),
+            status: status || 'Pending'
+        };
+
+        const existingInvoices = camera.invoices || [];
+        const updatedInvoices = [...existingInvoices, newInvoice];
+
+        const updateData = {
+            invoices: updatedInvoices
+        };
+
+        const updatedCamera = cameraData.updateItem(req.params.id, updateData);
+        if (updatedCamera) {
+            logger.info(`Updated camera invoice info: ${updatedCamera.camera} (ID: ${updatedCamera._id}) - Invoice: ${invoiceNumber}`);
+            res.json(updatedCamera);
+        } else {
+            res.status(404).json({ message: 'Camera not found' });
+        }
+    } catch (error) {
+        logger.error('Error updating camera invoice info:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+// Controller for updating camera invoiced duration
+function updateCameraInvoicedDuration(req, res) {
+    try {
+        const { invoicedDuration } = req.body;
+        
+        if (invoicedDuration === undefined || invoicedDuration === null) {
+            return res.status(400).json({ message: 'Invoiced duration is required' });
+        }
+
+        const updateData = {
+            invoicedDuration: invoicedDuration
+        };
+
+        const updatedCamera = cameraData.updateItem(req.params.id, updateData);
+        if (updatedCamera) {
+            logger.info(`Updated camera invoiced duration: ${updatedCamera.camera} (ID: ${updatedCamera._id}) - Duration: ${invoicedDuration}`);
+            res.json(updatedCamera);
+        } else {
+            res.status(404).json({ message: 'Camera not found' });
+        }
+    } catch (error) {
+        logger.error('Error updating camera invoiced duration:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 // Controller for deleting a Camera
 function deleteCamera(req, res) {
     const isDeleted = cameraData.deleteItem(req.params.id);
@@ -215,5 +285,7 @@ module.exports = {
     addCamera,
     updateCamera,
     updateCameraInstallationDate,
+    updateCameraInvoiceInfo,
+    updateCameraInvoicedDuration,
     deleteCamera
 };

@@ -86,7 +86,12 @@ const salesOrderController = {
                         contractDuration: cameraInfo.contractDuration,
                         serverFolder: cameraInfo.cameraId, // Using cameraId as server folder
                         isActive: true,
-                        createdDate: new Date().toISOString()
+                        createdDate: new Date().toISOString(),
+                        // Sales order tracking
+                        salesOrderId: currentSalesOrder._id,
+                        salesOrderNumber: currentSalesOrder.orderNumber,
+                        invoicedDuration: 0,
+                        invoices: []
                     };
                     
                     const createdCamera = cameraData.addItem(newCameraData);

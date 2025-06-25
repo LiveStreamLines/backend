@@ -15,6 +15,8 @@ router.get('/dev/:id', cameraController.getCameraByDeveloperId);
 router.post('/', cameraController.addCamera);
 router.put('/:id', cameraController.updateCamera);
 router.put('/:id/install', cameraController.updateCameraInstallationDate);
+router.put('/:id/invoice', cameraController.updateCameraInvoiceInfo);
+router.put('/:id/invoiced-duration', cameraController.updateCameraInvoicedDuration);
 router.delete('/:id', cameraController.deleteCamera);
 
 module.exports = router;

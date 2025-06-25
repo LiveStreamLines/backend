@@ -74,8 +74,8 @@ const salesOrderController = {
                 for (const cameraInfo of currentSalesOrder.cameras) {
                     // Create camera record
                     const newCameraData = {
-                        camera: cameraInfo.cameraName,
-                        cameraId: cameraInfo.cameraId,
+                        camera: cameraInfo.cameraId,
+                        cameraDescription: cameraInfo.cameraName,
                         project: currentSalesOrder.projectId,
                         developer: currentSalesOrder.customerId,
                         projectTag: currentSalesOrder.projectTag || currentSalesOrder.projectName,

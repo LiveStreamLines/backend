@@ -43,6 +43,9 @@ app.use('/media/upload', express.static(process.env.MEDIA_PATH +'/upload'));
 app.use('/canvas_images', express.static(process.env.MEDIA_PATH +'/canvas_images'));
 app.use('/media/music', express.static(process.env.MEDIA_PATH+'/music'));
 
+// Serve public HTML files (camera widget, iframe examples)
+app.use('/public', express.static('public'));
+
 // Use routes
 app.use('/logos', logoRoutes);
 app.use('/api/auth', authRoutes);

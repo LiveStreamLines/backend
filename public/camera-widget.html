@@ -220,18 +220,25 @@
     <script>
         class CameraWidget {
             constructor() {
-                this.apiBaseUrl = window.location.origin;
+                // Get configuration from URL parameters or use defaults
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                this.apiBaseUrl = 'https://lsl-platform.com/backend'; // Your backend URL
                 this.refreshInterval = 30 * 60 * 1000; // 30 minutes in milliseconds
                 this.retryAttempts = 3;
                 this.currentRetry = 0;
                 
-                // Configuration - Update these values as needed
+                // Configuration - Can be set via URL parameters or updated here
                 this.config = {
-                    projectId: 'your-project-id',    // Replace with actual project ID
-                    cameraId: 'your-camera-id',      // Replace with actual camera ID
+                    projectId: urlParams.get('projectId') || 'your-project-id',    // Replace with actual project ID
+                    cameraId: urlParams.get('cameraId') || 'your-camera-id',      // Replace with actual camera ID
                     developerId: 'seeb',             // Static developer ID from controller
-                    authToken: 'your-auth-token'     // Replace with actual auth token
+                    authToken: urlParams.get('token') || 'your-auth-token'     // Replace with actual auth token
                 };
+                
+                // Update camera info display
+                document.getElementById('cameraInfo').textContent = 
+                    `Project: ${this.config.projectId} | Camera: ${this.config.cameraId}`;
                 
                 this.init();
             }
@@ -275,7 +282,7 @@
             }
             
             async fetchImages(day1, time1) {
-                const url = `${this.apiBaseUrl}/api/getImage/${this.config.projectId}/${this.config.cameraId}/`;
+                const url = `${this.apiBaseUrl}/api/get-image/${this.config.projectId}/${this.config.cameraId}/`;
                 
                 const response = await fetch(url, {
                     method: 'POST',

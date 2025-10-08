@@ -79,13 +79,20 @@
         
         <div class="code-example">
             <h3>How to embed the camera widget:</h3>
+            <p><strong>Basic embedding:</strong></p>
             <pre><code>&lt;iframe 
-    src="http://your-domain.com/camera-widget.html" 
+    src="https://lsl-platform.com/backend/public/camera-widget.html?projectId=YOUR_PROJECT&cameraId=YOUR_CAMERA&token=YOUR_TOKEN" 
     width="600" 
     height="500" 
     frameborder="0"
     allowfullscreen&gt;
 &lt;/iframe&gt;</code></pre>
+            <p><strong>URL Parameters:</strong></p>
+            <ul>
+                <li><code>projectId</code> - Your project identifier</li>
+                <li><code>cameraId</code> - Your camera identifier</li>
+                <li><code>token</code> - Your authentication token</li>
+            </ul>
         </div>
         
         <div class="iframe-container">
@@ -109,8 +116,12 @@
         </div>
         
         <div class="code-example">
-            <h3>Configuration:</h3>
-            <p>Before using the widget, you need to update the configuration in <code>camera-widget.html</code>:</p>
+            <h3>Configuration Options:</h3>
+            <p><strong>Option 1: URL Parameters (Recommended)</strong></p>
+            <p>Pass configuration through URL query parameters as shown above.</p>
+            
+            <p><strong>Option 2: Edit HTML File</strong></p>
+            <p>Update the default values in <code>camera-widget.html</code>:</p>
             <ul>
                 <li><strong>projectId:</strong> Your project ID</li>
                 <li><strong>cameraId:</strong> Your camera ID</li>

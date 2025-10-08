@@ -266,7 +266,9 @@
                     if (response.images && response.images.length > 0) {
                         // Get the latest image (last in the sorted array)
                         const latestImage = response.images[response.images.length - 1];
-                        const imageUrl = `${response.path}${latestImage}.jpg`;
+                        
+                        // Construct the image URL using HTTPS and the correct path structure
+                        const imageUrl = `https://lsl-platform.com/backend/media/upload/${this.config.developerId}/${this.config.projectId}/${this.config.cameraId}/large/${latestImage}.jpg`;
                         
                         await this.displayImage(imageUrl);
                         this.updateStatus('online', 'Connected');

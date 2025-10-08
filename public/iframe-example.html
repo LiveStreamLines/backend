@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Widget Iframe Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .iframe-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .iframe-wrapper {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .iframe-title {
+            background: #4facfe;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        iframe {
+            border: none;
+            display: block;
+        }
+        
+        .code-example {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .code-example h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .code-example code {
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Camera Widget Iframe Examples</h1>
+        
+        <div class="code-example">
+            <h3>How to embed the camera widget:</h3>
+            <pre><code>&lt;iframe 
+    src="http://your-domain.com/camera-widget.html" 
+    width="600" 
+    height="500" 
+    frameborder="0"
+    allowfullscreen&gt;
+&lt;/iframe&gt;</code></pre>
+        </div>
+        
+        <div class="iframe-container">
+            <!-- Small widget -->
+            <div class="iframe-wrapper">
+                <div class="iframe-title">Small Widget (400x300)</div>
+                <iframe src="camera-widget.html" width="400" height="300"></iframe>
+            </div>
+            
+            <!-- Medium widget -->
+            <div class="iframe-wrapper">
+                <div class="iframe-title">Medium Widget (600x400)</div>
+                <iframe src="camera-widget.html" width="600" height="400"></iframe>
+            </div>
+            
+            <!-- Large widget -->
+            <div class="iframe-wrapper">
+                <div class="iframe-title">Large Widget (800x500)</div>
+                <iframe src="camera-widget.html" width="800" height="500"></iframe>
+            </div>
+        </div>
+        
+        <div class="code-example">
+            <h3>Configuration:</h3>
+            <p>Before using the widget, you need to update the configuration in <code>camera-widget.html</code>:</p>
+            <ul>
+                <li><strong>projectId:</strong> Your project ID</li>
+                <li><strong>cameraId:</strong> Your camera ID</li>
+                <li><strong>authToken:</strong> Your authentication token</li>
+            </ul>
+        </div>
+        
+        <div class="code-example">
+            <h3>Features:</h3>
+            <ul>
+                <li>✅ Automatically refreshes every 30 minutes</li>
+                <li>✅ Shows the latest image from the last hour</li>
+                <li>✅ Responsive design for different screen sizes</li>
+                <li>✅ Error handling and retry logic</li>
+                <li>✅ Loading states and status indicators</li>
+                <li>✅ Iframe-compatible styling</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

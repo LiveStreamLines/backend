@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .widget-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+        }
+
+        .widget-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .widget-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .widget-subtitle {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .last-updated {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .image-container {
+            position: relative;
+            background: #f8f9fa;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-image {
+            max-width: 100%;
+            max-height: 500px;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .camera-image:hover {
+            transform: scale(1.02);
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .error-message {
+            display: none;
+            text-align: center;
+            color: #e74c3c;
+            padding: 40px 20px;
+            font-size: 1.1em;
+        }
+
+        .no-image-message {
+            display: none;
+            text-align: center;
+            color: #7f8c8d;
+            padding: 40px 20px;
+            font-size: 1.1em;
+        }
+
+        .refresh-indicator {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 0.8em;
+            opacity: 0.7;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .refresh-dot {
+            width: 8px;
+            height: 8px;
+            background: #4facfe;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .widget-footer {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #6c757d;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background: #28a745;
+        }
+
+        .status-offline {
+            background: #dc3545;
+        }
+
+        .status-loading {
+            background: #ffc107;
+        }
+
+        @media (max-width: 768px) {
+            .widget-container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+            
+            .widget-header {
+                padding: 15px;
+            }
+            
+            .widget-title {
+                font-size: 1.3em;
+            }
+            
+            .last-updated {
+                position: static;
+                margin-top: 10px;
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container">
+        <div class="widget-header">
+            <div class="refresh-indicator">
+                <div class="refresh-dot"></div>
+                Auto-refresh: 30min
+            </div>
+            <div class="last-updated" id="lastUpdated">Loading...</div>
+            <h2 class="widget-title">Live Camera Feed</h2>
+            <p class="widget-subtitle" id="cameraInfo">Camera Widget</p>
+        </div>
+        
+        <div class="image-container">
+            <div class="loading-spinner" id="loadingSpinner"></div>
+            <img class="camera-image" id="cameraImage" style="display: none;" alt="Camera Feed">
+            <div class="error-message" id="errorMessage">
+                <h3>⚠️ Unable to Load Image</h3>
+                <p>Please check your connection and try again.</p>
+            </div>
+            <div class="no-image-message" id="noImageMessage">
+                <h3>📷 No Images Available</h3>
+                <p>No recent images found for this camera.</p>
+            </div>
+        </div>
+        
+        <div class="widget-footer">
+            <span class="status-indicator" id="statusIndicator"></span>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </div>
+
+    <script>
+        class CameraWidget {
+            constructor() {
+                this.apiBaseUrl = window.location.origin;
+                this.refreshInterval = 30 * 60 * 1000; // 30 minutes in milliseconds
+                this.retryAttempts = 3;
+                this.currentRetry = 0;
+                
+                // Configuration - Update these values as needed
+                this.config = {
+                    projectId: 'your-project-id',    // Replace with actual project ID
+                    cameraId: 'your-camera-id',      // Replace with actual camera ID
+                    developerId: 'seeb',             // Static developer ID from controller
+                    authToken: 'your-auth-token'     // Replace with actual auth token
+                };
+                
+                this.init();
+            }
+            
+            init() {
+                this.updateLastUpdated();
+                this.loadLatestImage();
+                this.startAutoRefresh();
+            }
+            
+            async loadLatestImage() {
+                this.showLoading();
+                this.updateStatus('loading', 'Loading...');
+                
+                try {
+                    // Get current date/time for the last hour
+                    const now = new Date();
+                    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+                    
+                    const day1 = this.formatDate(oneHourAgo);
+                    const time1 = this.formatTime(oneHourAgo);
+                    
+                    const response = await this.fetchImages(day1, time1);
+                    
+                    if (response.images && response.images.length > 0) {
+                        // Get the latest image (last in the sorted array)
+                        const latestImage = response.images[response.images.length - 1];
+                        const imageUrl = `${response.path}${latestImage}.jpg`;
+                        
+                        await this.displayImage(imageUrl);
+                        this.updateStatus('online', 'Connected');
+                        this.currentRetry = 0;
+                    } else {
+                        this.showNoImage();
+                        this.updateStatus('offline', 'No images available');
+                    }
+                } catch (error) {
+                    console.error('Error loading image:', error);
+                    this.handleError();
+                }
+            }
+            
+            async fetchImages(day1, time1) {
+                const url = `${this.apiBaseUrl}/api/getImage/${this.config.projectId}/${this.config.cameraId}/`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.config.authToken}`
+                    },
+                    body: JSON.stringify({
+                        day1: day1,
+                        time1: time1
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            }
+            
+            async displayImage(imageUrl) {
+                return new Promise((resolve, reject) => {
+                    const img = document.getElementById('cameraImage');
+                    
+                    img.onload = () => {
+                        this.hideAllMessages();
+                        img.style.display = 'block';
+                        this.updateLastUpdated();
+                        resolve();
+                    };
+                    
+                    img.onerror = () => {
+                        reject(new Error('Failed to load image'));
+                    };
+                    
+                    img.src = imageUrl;
+                });
+            }
+            
+            handleError() {
+                this.currentRetry++;
+                
+                if (this.currentRetry < this.retryAttempts) {
+                    // Retry after a delay
+                    setTimeout(() => {
+                        this.loadLatestImage();
+                    }, 5000 * this.currentRetry); // Exponential backoff
+                } else {
+                    this.showError();
+                    this.updateStatus('offline', 'Connection failed');
+                }
+            }
+            
+            showLoading() {
+                this.hideAllMessages();
+                document.getElementById('loadingSpinner').style.display = 'block';
+            }
+            
+            showError() {
+                this.hideAllMessages();
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+            
+            showNoImage() {
+                this.hideAllMessages();
+                document.getElementById('noImageMessage').style.display = 'block';
+            }
+            
+            hideAllMessages() {
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('errorMessage').style.display = 'none';
+                document.getElementById('noImageMessage').style.display = 'none';
+                document.getElementById('cameraImage').style.display = 'none';
+            }
+            
+            updateStatus(status, text) {
+                const indicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+                
+                indicator.className = `status-indicator status-${status}`;
+                statusText.textContent = text;
+            }
+            
+            updateLastUpdated() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                document.getElementById('lastUpdated').textContent = `Last updated: ${timeString}`;
+            }
+            
+            startAutoRefresh() {
+                setInterval(() => {
+                    this.loadLatestImage();
+                }, this.refreshInterval);
+            }
+            
+            formatDate(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}${month}${day}`;
+            }
+            
+            formatTime(date) {
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${hours}${minutes}${seconds}`;
+            }
+        }
+        
+        // Initialize the widget when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new CameraWidget();
+        });
+        
+        // Handle iframe communication (optional)
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'updateConfig') {
+                // Allow parent window to update configuration
+                if (window.cameraWidget) {
+                    Object.assign(window.cameraWidget.config, event.data.config);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

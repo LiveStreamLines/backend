@@ -110,7 +110,7 @@ function getImagesByDateRange(req, res) {
       start: `${day1} ${time1.slice(0,2)}:${time1.slice(2,4)}:${time1.slice(4,6)}`,
       end: `${finalDay2} ${finalTime2.slice(0,2)}:${finalTime2.slice(2,4)}:${finalTime2.slice(4,6)}`
     },
-    path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`,
+    path: `${req.protocol}://${req.get('host')}/backend/media/upload/${developerId}/${projectId}/${cameraId}/large`,
     autoCalculated: !day2 || !time2 // Indicate if the end time was auto-calculated
   });
 }

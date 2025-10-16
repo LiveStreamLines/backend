@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('../logger');
 const salesOrderData = require('../models/salesOrderData');
+const multer = require('multer');
+const DataModel = require('../models/DataModel');
 
 /// Controller for getting all projects
 function getAllProjects(req, res) {
@@ -178,6 +180,109 @@ function getAvailableProjectsForSalesOrder(req, res) {
     }
 }
 
+// Attachment Controllers
+function uploadProjectAttachment(req, res) {
+    try {
+        const projectId = req.params.projectId;
+        const file = req.file;
+        
+        if (!file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        // Check if project exists
+        const project = projectData.getItemById(projectId);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        // Create attachment object
+        const dataModel = new DataModel('temp');
+        const attachment = {
+            _id: dataModel.generateCustomId(),
+            name: file.filename,
+            originalName: file.originalname,
+            size: file.size,
+            type: file.mimetype,
+            url: `/media/attachments/projects/${projectId}/${file.filename}`,
+            uploadedAt: new Date().toISOString(),
+            uploadedBy: req.user?.id || 'system'
+        };
+
+        // Add attachment to project
+        if (!project.attachments) {
+            project.attachments = [];
+        }
+        project.attachments.push(attachment);
+
+        // Update project in database
+        projectData.updateItem(projectId, { attachments: project.attachments });
+
+        res.status(201).json(attachment);
+    } catch (error) {
+        logger.error('Error uploading project attachment:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+function getProjectAttachments(req, res) {
+    try {
+        const projectId = req.params.projectId;
+        
+        // Check if project exists
+        const project = projectData.getItemById(projectId);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        const attachments = project.attachments || [];
+        res.json(attachments);
+    } catch (error) {
+        logger.error('Error getting project attachments:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+function deleteProjectAttachment(req, res) {
+    try {
+        const projectId = req.params.projectId;
+        const attachmentId = req.params.attachmentId;
+        
+        // Check if project exists
+        const project = projectData.getItemById(projectId);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        if (!project.attachments) {
+            return res.status(404).json({ message: 'No attachments found' });
+        }
+
+        // Find and remove attachment
+        const attachmentIndex = project.attachments.findIndex(att => att._id === attachmentId);
+        if (attachmentIndex === -1) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = project.attachments[attachmentIndex];
+        
+        // Delete file from filesystem
+        const filePath = path.join(process.env.MEDIA_PATH, 'attachments/projects', projectId, attachment.name);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        // Remove attachment from project
+        project.attachments.splice(attachmentIndex, 1);
+        projectData.updateItem(projectId, { attachments: project.attachments });
+
+        res.json({ message: 'Attachment deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting project attachment:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 module.exports = {
     getAllProjects,
     getProjectById,
@@ -188,5 +293,8 @@ module.exports = {
     updateProject,
     deleteProject,
     getProjectsByDeveloper,
-    getAvailableProjectsForSalesOrder
+    getAvailableProjectsForSalesOrder,
+    uploadProjectAttachment,
+    getProjectAttachments,
+    deleteProjectAttachment
 };

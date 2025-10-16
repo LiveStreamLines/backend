@@ -42,6 +42,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/media/upload', express.static(process.env.MEDIA_PATH +'/upload'));
 app.use('/canvas_images', express.static(process.env.MEDIA_PATH +'/canvas_images'));
 app.use('/media/music', express.static(process.env.MEDIA_PATH+'/music'));
+app.use('/media/attachments', express.static(process.env.MEDIA_PATH + '/attachments'));
 
 // Serve public HTML files (camera widget, iframe examples)
 app.use('/public', express.static('public'));

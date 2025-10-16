@@ -7,6 +7,12 @@ const salesOrderData = require('../models/salesOrderData');
 const multer = require('multer');
 const DataModel = require('../models/DataModel');
 
+// Get base URL for attachments (for remote deployment)
+const getAttachmentBaseUrl = () => {
+    // Use environment variable or default to /backend for production
+    return process.env.ATTACHMENT_BASE_URL || '/backend';
+};
+
 /// Controller for getting all projects
 function getAllProjects(req, res) {
     try {
@@ -204,7 +210,7 @@ function uploadProjectAttachment(req, res) {
             originalName: file.originalname,
             size: file.size,
             type: file.mimetype,
-            url: `/media/attachments/projects/${projectId}/${file.filename}`,
+            url: `${getAttachmentBaseUrl()}/media/attachments/projects/${projectId}/${file.filename}`,
             uploadedAt: new Date().toISOString(),
             uploadedBy: req.user?.id || 'system'
         };

@@ -210,7 +210,7 @@ function uploadProjectAttachment(req, res) {
             originalName: file.originalname,
             size: file.size,
             type: file.mimetype,
-            url: `${getAttachmentBaseUrl()}/media/attachments/projects/${projectId}/${file.filename}`,
+            url: `/backend/media/attachments/projects/${projectId}/${file.filename}`,
             uploadedAt: new Date().toISOString(),
             uploadedBy: req.user?.id || 'system'
         };

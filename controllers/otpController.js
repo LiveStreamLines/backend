@@ -63,10 +63,11 @@ exports.verifyOtp = (req, res) => {
             return res.status(403).json({ msg: 'User account is inactive' });
         }
 
-        // Generate a JWT token
+        // Generate a JWT token with expiration (24 hours)
         const authToken = jwt.sign(
           { phone: user.phone, role: user.role },
-          'secretKey'
+          'secretKey',
+          { expiresIn: '24h' } // Token expires in 24 hours
         );
 
           // Extract IDs for authorized developers and projects from the user object

@@ -27,10 +27,11 @@ function login(req, res) {
         return res.status(200).json({ phoneRequired: true, userId: user._id, msg: 'Phone verification required.' });
       }
   
-      // Create a JWT token with user information
+      // Create a JWT token with user information and expiration (24 hours)
       const authToken = jwt.sign(
         { email: user.email, role: user.role },
-        'secretKey'
+        'secretKey',
+        { expiresIn: '24h' } // Token expires in 24 hours
       );
       
   

@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const sendEmail = require('../utils/email'); // Replace with your email utility
 const logger = require('../logger');
 
+// In-memory blacklist for testing - stores emails of users to force logout
+const logoutBlacklist = new Set();
+
 
 
 function login(req, res) {
@@ -177,9 +180,71 @@ function resetPassword(req, res) {
   
 }
 
+// Test endpoint to force logout a specific user by email
+function forceLogoutUser(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ msg: 'Email is required' });
+  }
+
+  const emailLower = email.toLowerCase();
+  
+  // Find user by email to verify they exist
+  const user = userData.getUserByEmail(emailLower);
+  
+  if (!user || user.length === 0) {
+    return res.status(404).json({ msg: 'User not found' });
+  }
+
+  // Add email to blacklist
+  logoutBlacklist.add(emailLower);
+  logger.info(`User ${emailLower} added to logout blacklist`);
+
+  res.status(200).json({ 
+    msg: `User ${emailLower} will be logged out on their next request`,
+    email: emailLower
+  });
+}
+
+// Test endpoint to remove user from logout blacklist
+function removeFromLogoutBlacklist(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ msg: 'Email is required' });
+  }
+
+  const emailLower = email.toLowerCase();
+  logoutBlacklist.delete(emailLower);
+  logger.info(`User ${emailLower} removed from logout blacklist`);
+
+  res.status(200).json({ 
+    msg: `User ${emailLower} removed from logout blacklist`,
+    email: emailLower
+  });
+}
+
+// Get logout blacklist (for testing/debugging)
+function getLogoutBlacklist(req, res) {
+  res.status(200).json({ 
+    blacklistedEmails: Array.from(logoutBlacklist)
+  });
+}
+
+// Export function to check if user is blacklisted (used by auth middleware)
+function isUserBlacklisted(email) {
+  if (!email) return false;
+  return logoutBlacklist.has(email.toLowerCase());
+}
+
 module.exports = {
     login,
     getUserByEmail,
     sendResetPasswordLink,
-    resetPassword
+    resetPassword,
+    forceLogoutUser,
+    removeFromLogoutBlacklist,
+    getLogoutBlacklist,
+    isUserBlacklisted
 };

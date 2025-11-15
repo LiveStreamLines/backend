@@ -9,4 +9,7 @@ router.use(authMiddleware);
 // Route to get images by date range with authentication required
 router.post('/:projectId/:cameraId/', getImageController.getImagesByDateRange);
 
+// Route to delete a specific image by timestamp with authentication required
+router.delete('/:developerId/:projectId/:cameraId/:imageTimestamp', getImageController.deleteImage);
+
 module.exports = router;

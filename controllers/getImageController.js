@@ -115,6 +115,79 @@ function getImagesByDateRange(req, res) {
   });
 }
 
+function deleteImage(req, res) {
+  try {
+    const { developerId, projectId, cameraId, imageTimestamp } = req.params;
+
+    // Validate required parameters
+    if (!developerId || !projectId || !cameraId || !imageTimestamp) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters: developerId, projectId, cameraId, imageTimestamp' 
+      });
+    }
+
+    // Validate image timestamp format (YYYYMMDDHHMMSS)
+    const timestampRegex = /^\d{14}$/;
+    if (!timestampRegex.test(imageTimestamp)) {
+      return res.status(400).json({ 
+        error: 'Invalid image timestamp format. Use YYYYMMDDHHMMSS format (e.g., 20240114143000)' 
+      });
+    }
+
+    const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
+
+    // Check if the camera directory exists
+    if (!fs.existsSync(cameraPath)) {
+      return res.status(404).json({ 
+        error: 'Camera directory not found',
+        developerId,
+        projectId,
+        cameraId
+      });
+    }
+
+    // Construct the image filename
+    const imageFileName = `${imageTimestamp}.jpg`;
+    const imagePath = path.join(cameraPath, imageFileName);
+
+    // Check if the image file exists
+    if (!fs.existsSync(imagePath)) {
+      return res.status(404).json({ 
+        error: 'Image not found',
+        imageTimestamp,
+        filename: imageFileName
+      });
+    }
+
+    // Delete the image file
+    try {
+      fs.unlinkSync(imagePath);
+      logger.info(`Deleted image: ${imageFileName} from ${developerId}/${projectId}/${cameraId}`);
+
+      res.status(200).json({
+        message: 'Image deleted successfully',
+        imageTimestamp,
+        filename: imageFileName,
+        path: `${developerId}/${projectId}/${cameraId}/large/${imageFileName}`
+      });
+    } catch (deleteError) {
+      logger.error(`Error deleting image ${imageFileName}:`, deleteError);
+      res.status(500).json({
+        error: 'Failed to delete image',
+        message: deleteError.message,
+        imageTimestamp
+      });
+    }
+  } catch (error) {
+    logger.error('Error in deleteImage:', error);
+    res.status(500).json({
+      error: 'Failed to delete image',
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
-  getImagesByDateRange
+  getImagesByDateRange,
+  deleteImage
 };

@@ -26,6 +26,7 @@ const deviceTypeRoutes = require('./routes/deviceType');
 const maintenanceRoutes = require('./routes/maintenance');
 const salesOrderRoutes = require('./routes/salesOrder');
 const getImageRoutes = require('./routes/getImage');
+const healthRoutes = require('./routes/health');
 
 
 
@@ -68,6 +69,7 @@ app.use('/api/device-types', deviceTypeRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/get-image', getImageRoutes);
+app.use('/health', healthRoutes);
 
 
 

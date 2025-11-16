@@ -1,4 +1,5 @@
 const maintenanceData = require('../models/maintenanceData');
+const userData = require('../models/userData');
 const logger = require('../logger');
 
 const maintenanceController = {
@@ -28,7 +29,34 @@ const maintenanceController = {
     // Create new maintenance request
     createMaintenance: (req, res) => {
         try {
-            const maintenance = maintenanceData.addItem(req.body);
+            // Ensure creator information is registered
+            const taskData = { ...req.body };
+            
+            // If addedUserId is not provided, try to get it from the authenticated user
+            if (!taskData.addedUserId && req.user) {
+                // JWT token contains email, so look up user by email to get _id
+                if (req.user.email) {
+                    const users = userData.getAllItems();
+                    const user = users.find(u => u.email === req.user.email);
+                    if (user) {
+                        taskData.addedUserId = user._id;
+                        taskData.addedUserName = user.name;
+                    }
+                }
+                
+                // Fallback: try direct fields from req.user
+                if (!taskData.addedUserId) {
+                    taskData.addedUserId = req.user._id || req.user.id || req.user.userId;
+                    taskData.addedUserName = req.user.name || req.user.userName;
+                }
+            }
+            
+            // If still no creator info, log a warning but continue
+            if (!taskData.addedUserId) {
+                logger.warn('Task created without creator information', { body: req.body, user: req.user });
+            }
+            
+            const maintenance = maintenanceData.addItem(taskData);
             res.status(201).json(maintenance);
         } catch (error) {
             res.status(500).json({ message: error.message });

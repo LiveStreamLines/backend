@@ -29,18 +29,22 @@ const maintenanceController = {
     // Create new maintenance request
     createMaintenance: (req, res) => {
         try {
-            // Ensure creator information is registered
+            // Ensure creator information is registered with user ID (not just name)
             const taskData = { ...req.body };
             
-            // If addedUserId is not provided, try to get it from the authenticated user
+            // Priority 1: Use addedUserId from request body if provided
+            // Priority 2: Look up user by email from JWT token to get _id
+            // Priority 3: Try direct fields from req.user
             if (!taskData.addedUserId && req.user) {
                 // JWT token contains email, so look up user by email to get _id
                 if (req.user.email) {
                     const users = userData.getAllItems();
                     const user = users.find(u => u.email === req.user.email);
                     if (user) {
+                        // Ensure we save the user ID (_id), not the name
                         taskData.addedUserId = user._id;
                         taskData.addedUserName = user.name;
+                        logger.info(`Task creator registered: ID=${user._id}, Name=${user.name}`);
                     }
                 }
                 
@@ -51,14 +55,28 @@ const maintenanceController = {
                 }
             }
             
-            // If still no creator info, log a warning but continue
-            if (!taskData.addedUserId) {
-                logger.warn('Task created without creator information', { body: req.body, user: req.user });
+            // Validate that addedUserId is set (it should be the user's _id, not name)
+            if (taskData.addedUserId) {
+                // Ensure addedUserId is actually an ID (not a name)
+                // If it looks like a name (contains spaces or is too short), try to find the user
+                if (taskData.addedUserId.length < 10 || taskData.addedUserId.includes(' ')) {
+                    logger.warn('addedUserId appears to be a name, looking up user', { addedUserId: taskData.addedUserId });
+                    const users = userData.getAllItems();
+                    const user = users.find(u => u.name === taskData.addedUserId || u.email === taskData.addedUserId);
+                    if (user) {
+                        taskData.addedUserId = user._id;
+                        taskData.addedUserName = user.name;
+                    }
+                }
+                logger.info(`Task will be saved with creator: addedUserId=${taskData.addedUserId}, addedUserName=${taskData.addedUserName}`);
+            } else {
+                logger.warn('Task created without creator ID (addedUserId)', { body: req.body, user: req.user });
             }
             
             const maintenance = maintenanceData.addItem(taskData);
             res.status(201).json(maintenance);
         } catch (error) {
+            logger.error('Error creating maintenance task', error);
             res.status(500).json({ message: error.message });
         }
     },

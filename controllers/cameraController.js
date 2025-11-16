@@ -168,6 +168,49 @@ function updateCamera(req, res) {
     }
 }
 
+// Controller for updating camera maintenance status flags
+// Allows toggling backend-persisted flags like:
+// - maintenanceStatus.photoDirty
+// - maintenanceStatus.lowImages (e.g. "Maintenance / less image number")
+function updateCameraMaintenanceStatus(req, res) {
+    try {
+        const { photoDirty, lowImages } = req.body || {};
+
+        // Ensure at least one field is provided
+        if (photoDirty === undefined && lowImages === undefined) {
+            return res.status(400).json({ message: 'No maintenance status fields provided.' });
+        }
+
+        const camera = cameraData.getItemById(req.params.id);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        const currentStatus = camera.maintenanceStatus || {};
+        const nextStatus = { ...currentStatus };
+
+        if (typeof photoDirty === 'boolean') {
+            nextStatus.photoDirty = photoDirty;
+        }
+        if (typeof lowImages === 'boolean') {
+            nextStatus.lowImages = lowImages;
+        }
+
+        const updatedCamera = cameraData.updateItem(req.params.id, {
+            maintenanceStatus: nextStatus,
+        });
+
+        logger.info(
+          `Updated camera maintenance status: ${updatedCamera.camera} (ID: ${updatedCamera._id})`,
+        );
+
+        res.json(updatedCamera);
+    } catch (error) {
+        logger.error('Error updating camera maintenance status:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 // Controller for updating camera installation date
 function updateCameraInstallationDate(req, res) {
     try {
@@ -284,6 +327,7 @@ module.exports = {
     getCameraByDeveloperId,
     addCamera,
     updateCamera,
+    updateCameraMaintenanceStatus,
     updateCameraInstallationDate,
     updateCameraInvoiceInfo,
     updateCameraInvoicedDuration,

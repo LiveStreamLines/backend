@@ -14,6 +14,7 @@ router.get('/projtag/:tag', cameraController.getCameraByProjectTag);
 router.get('/dev/:id', cameraController.getCameraByDeveloperId);
 router.post('/', cameraController.addCamera);
 router.put('/:id', cameraController.updateCamera);
+router.put('/:id/maintenance-status', cameraController.updateCameraMaintenanceStatus);
 router.put('/:id/install', cameraController.updateCameraInstallationDate);
 router.put('/:id/invoice', cameraController.updateCameraInvoiceInfo);
 router.put('/:id/invoiced-duration', cameraController.updateCameraInvoicedDuration);

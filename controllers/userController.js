@@ -44,6 +44,26 @@ function addUser(req, res) {
             newUser[field] = [];
         }
     });
+    
+    // Parse boolean fields from strings (FormData sends booleans as strings 'true'/'false')
+    const booleanFields = [
+        'hasUaeAccess', 'hasSaudiAccess', 'canManageDevProjCam', 'hasCameraMonitorAccess',
+        'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
+        'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
+        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canAssignUnassignUser',
+        'canAssignUnassignProject', 'canArchiveMemory', 'isActive'
+    ];
+    booleanFields.forEach(field => {
+        if (newUser[field] !== undefined && newUser[field] !== null) {
+            if (typeof newUser[field] === 'string') {
+                newUser[field] = newUser[field].toLowerCase() === 'true';
+            } else {
+                newUser[field] = !!newUser[field];
+            }
+        } else {
+            newUser[field] = false;
+        }
+    });
     //check if email is new
     const usercheck = userData.getUserByEmail(req.body.email);
     logger.info(usercheck);
@@ -97,6 +117,25 @@ function updateUser(req, res) {
         if (updatePayload[field] !== undefined && !Array.isArray(updatePayload[field])) {
             updatePayload[field] = [];
         }
+    });
+    
+    // Parse boolean fields from strings (FormData sends booleans as strings 'true'/'false')
+    const booleanFields = [
+        'hasUaeAccess', 'hasSaudiAccess', 'canManageDevProjCam', 'hasCameraMonitorAccess',
+        'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
+        'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
+        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canAssignUnassignUser',
+        'canAssignUnassignProject', 'canArchiveMemory', 'isActive'
+    ];
+    booleanFields.forEach(field => {
+        if (updatePayload[field] !== undefined && updatePayload[field] !== null) {
+            if (typeof updatePayload[field] === 'string') {
+                updatePayload[field] = updatePayload[field].toLowerCase() === 'true';
+            } else {
+                updatePayload[field] = !!updatePayload[field];
+            }
+        }
+        // Don't set to false if undefined - let it remain undefined to preserve existing values
     });
 
     if (req.file) {

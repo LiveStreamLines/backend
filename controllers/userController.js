@@ -1,5 +1,11 @@
 const userData = require('../models/userData');
 const logger = require('../logger');
+const path = require('path');
+const fs = require('fs');
+
+function getLogoFilePath(fileName) {
+    return path.join(process.env.MEDIA_PATH, 'logos', 'user', fileName);
+}
 
 
 // Controller for getting all Users
@@ -30,13 +36,53 @@ function addUser(req, res) {
         res.status(500).json({message: "Email is already Registered"});
     } else {    
         const addedUser = userData.addItem(newUser);
-        res.status(201).json(addedUser);
+
+        if (req.file) {
+            try {
+                const logoFileName = `${addedUser._id}${path.extname(req.file.originalname)}`;
+                const logoFilePath = getLogoFilePath(logoFileName);
+
+                fs.mkdirSync(path.dirname(logoFilePath), { recursive: true });
+                if (req.file.path !== logoFilePath) {
+                    fs.renameSync(req.file.path, logoFilePath);
+                }
+
+                const finalUser = userData.updateItem(addedUser._id, { logo: `logos/user/${logoFileName}` });
+                return res.status(201).json(finalUser);
+            } catch (error) {
+                logger.error('Error saving user logo:', error);
+                return res.status(500).json({ message: 'Failed to save logo file' });
+            }
+        } else {
+            const finalUser = userData.updateItem(addedUser._id, { logo: '' });
+            return res.status(201).json(finalUser);
+        }
     }
 }
 
 // Controller for updating a User
 function updateUser(req, res) {
-    const updatedUser = userData.updateItem(req.params.id, req.body);
+    const userId = req.params.id;
+    const updatePayload = { ...req.body };
+
+    if (req.file) {
+        try {
+            const logoFileName = `${userId}${path.extname(req.file.originalname)}`;
+            const logoFilePath = getLogoFilePath(logoFileName);
+
+            fs.mkdirSync(path.dirname(logoFilePath), { recursive: true });
+            if (req.file.path !== logoFilePath) {
+                fs.renameSync(req.file.path, logoFilePath);
+            }
+
+            updatePayload.logo = `logos/user/${logoFileName}`;
+        } catch (error) {
+            logger.error('Error saving user logo:', error);
+            return res.status(500).json({ message: 'Failed to save logo file' });
+        }
+    }
+
+    const updatedUser = userData.updateItem(userId, updatePayload);
     if (updatedUser) {
         res.json(updatedUser);
     } else {

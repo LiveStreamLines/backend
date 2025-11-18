@@ -122,7 +122,7 @@ const maintenanceController = {
                                 originalName: file.originalname,
                                 size: file.size,
                                 type: file.mimetype,
-                                url: `attachments/maintenance/${taskId}/${newFileName}`,
+                                url: `/backend/media/attachments/maintenance/${taskId}/${newFileName}`,
                                 uploadedAt: new Date().toISOString(),
                                 uploadedBy: taskData.addedUserId || req.user?.id || 'system'
                             };

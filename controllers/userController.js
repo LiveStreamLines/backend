@@ -26,7 +26,24 @@ function getUserById(req, res) {
 
 // Controller for adding a new User
 function addUser(req, res) {
-    const newUser = req.body;
+    const newUser = { ...req.body };
+    
+    // Parse array fields from JSON strings (FormData sends arrays as JSON strings)
+    const arrayFields = ['accessibleDevelopers', 'accessibleProjects', 'accessibleCameras', 'accessibleServices'];
+    arrayFields.forEach(field => {
+        if (newUser[field] && typeof newUser[field] === 'string') {
+            try {
+                newUser[field] = JSON.parse(newUser[field]);
+            } catch (e) {
+                // If parsing fails, try to handle as comma-separated string
+                newUser[field] = newUser[field].split(',').map(item => item.trim()).filter(item => item.length > 0);
+            }
+        }
+        // Ensure it's an array
+        if (!Array.isArray(newUser[field])) {
+            newUser[field] = [];
+        }
+    });
     //check if email is new
     const usercheck = userData.getUserByEmail(req.body.email);
     logger.info(usercheck);
@@ -64,6 +81,23 @@ function addUser(req, res) {
 function updateUser(req, res) {
     const userId = req.params.id;
     const updatePayload = { ...req.body };
+    
+    // Parse array fields from JSON strings (FormData sends arrays as JSON strings)
+    const arrayFields = ['accessibleDevelopers', 'accessibleProjects', 'accessibleCameras', 'accessibleServices'];
+    arrayFields.forEach(field => {
+        if (updatePayload[field] && typeof updatePayload[field] === 'string') {
+            try {
+                updatePayload[field] = JSON.parse(updatePayload[field]);
+            } catch (e) {
+                // If parsing fails, try to handle as comma-separated string
+                updatePayload[field] = updatePayload[field].split(',').map(item => item.trim()).filter(item => item.length > 0);
+            }
+        }
+        // Ensure it's an array (if field exists but is not an array, make it empty array)
+        if (updatePayload[field] !== undefined && !Array.isArray(updatePayload[field])) {
+            updatePayload[field] = [];
+        }
+    });
 
     if (req.file) {
         try {

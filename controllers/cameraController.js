@@ -3,6 +3,7 @@ const path = require('path');
 const cameraData = require('../models/cameraData');
 const developerData = require('../models/developerData');
 const projectData = require("../models/projectData");
+const userData = require('../models/userData');
 const logger = require('../logger');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
@@ -193,7 +194,20 @@ function updateCameraMaintenanceStatus(req, res) {
             nextStatus.photoDirty = photoDirty;
             // Track who clicked and when
             if (photoDirty) {
-                nextStatus.photoDirtyMarkedBy = req.user?.name || req.user?.id || req.user?._id || 'Unknown';
+                let markedBy = 'Unknown';
+                // Try to get user name from userData by email (JWT token contains email)
+                if (req.user && req.user.email) {
+                    const users = userData.getAllItems();
+                    const user = users.find(u => u.email === req.user.email);
+                    if (user) {
+                        markedBy = user.name || user._id || 'Unknown';
+                    }
+                }
+                // Fallback: try direct fields from req.user
+                if (markedBy === 'Unknown' && req.user) {
+                    markedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
+                }
+                nextStatus.photoDirtyMarkedBy = markedBy;
                 nextStatus.photoDirtyMarkedAt = new Date().toISOString();
             } else {
                 // Clear tracking info when unmarking

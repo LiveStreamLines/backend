@@ -194,11 +194,76 @@ function deleteDeveloper(req, res) {
     }
 }
 
+// Controller for deleting an attachment
+function deleteAttachment(req, res) {
+    try {
+        const developerId = req.params.id;
+        const attachmentId = req.params.attachmentId;
+
+        const developer = developerData.getItemById(developerId);
+        if (!developer) {
+            return res.status(404).json({ message: 'Developer not found' });
+        }
+
+        const attachments = developer.internalAttachments || [];
+        const attachmentIndex = attachments.findIndex(att => att._id === attachmentId);
+
+        if (attachmentIndex === -1) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = attachments[attachmentIndex];
+        
+        // Delete the physical file if it exists
+        if (attachment.url) {
+            try {
+                // Extract file path from URL (e.g., /media/attachments/developers/{developerId}/{fileName})
+                // URL format: /media/attachments/developers/{developerId}/{fileName}
+                let urlPath = attachment.url;
+                if (urlPath.startsWith('/media/')) {
+                    urlPath = urlPath.replace('/media/', '');
+                } else if (urlPath.startsWith('media/')) {
+                    urlPath = urlPath.replace('media/', '');
+                } else if (urlPath.startsWith('/')) {
+                    urlPath = urlPath.slice(1);
+                }
+                const filePath = path.join(MEDIA_ROOT, urlPath);
+                
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    logger.info(`Deleted attachment file: ${filePath}`);
+                } else {
+                    logger.warn(`Attachment file not found: ${filePath}`);
+                }
+            } catch (fileError) {
+                logger.warn(`Failed to delete attachment file: ${fileError.message}`);
+                // Continue with database deletion even if file deletion fails
+            }
+        }
+
+        // Remove attachment from array
+        const updatedAttachments = attachments.filter(att => att._id !== attachmentId);
+        const updatedDeveloper = developerData.updateItem(developerId, { 
+            internalAttachments: updatedAttachments 
+        });
+
+        if (updatedDeveloper) {
+            return res.json(updatedDeveloper);
+        } else {
+            return res.status(500).json({ message: 'Failed to update developer' });
+        }
+    } catch (error) {
+        logger.error('Error deleting attachment', error);
+        return res.status(500).json({ message: 'Failed to delete attachment' });
+    }
+}
+
 module.exports = {
     getAllDevelopers,
     getDeveloperById,
     getDeveloperbyTag,
     addDeveloper,
     updateDeveloper,
-    deleteDeveloper
+    deleteDeveloper,
+    deleteAttachment
 };

@@ -54,5 +54,6 @@ router.get('/tag/:tag', developerController.getDeveloperbyTag);
 router.post('/', uploadFields, developerController.addDeveloper);
 router.put('/:id', uploadFields, developerController.updateDeveloper);
 router.delete('/:id', developerController.deleteDeveloper);
+router.delete('/:id/attachments/:attachmentId', developerController.deleteAttachment);
 
 module.exports = router;

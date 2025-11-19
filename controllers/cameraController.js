@@ -191,6 +191,15 @@ function updateCameraMaintenanceStatus(req, res) {
 
         if (typeof photoDirty === 'boolean') {
             nextStatus.photoDirty = photoDirty;
+            // Track who clicked and when
+            if (photoDirty) {
+                nextStatus.photoDirtyMarkedBy = req.user?.name || req.user?.id || req.user?._id || 'Unknown';
+                nextStatus.photoDirtyMarkedAt = new Date().toISOString();
+            } else {
+                // Clear tracking info when unmarking
+                nextStatus.photoDirtyMarkedBy = undefined;
+                nextStatus.photoDirtyMarkedAt = undefined;
+            }
         }
         if (typeof lowImages === 'boolean') {
             nextStatus.lowImages = lowImages;

@@ -175,10 +175,10 @@ function updateCamera(req, res) {
 // - maintenanceStatus.lowImages (e.g. "Maintenance / less image number")
 function updateCameraMaintenanceStatus(req, res) {
     try {
-        const { photoDirty, lowImages } = req.body || {};
-
+        const { photoDirty, lowImages, betterView } = req.body || {};
+        
         // Ensure at least one field is provided
-        if (photoDirty === undefined && lowImages === undefined) {
+        if (photoDirty === undefined && lowImages === undefined && betterView === undefined) {
             return res.status(400).json({ message: 'No maintenance status fields provided.' });
         }
 
@@ -235,6 +235,49 @@ function updateCameraMaintenanceStatus(req, res) {
         }
         if (typeof lowImages === 'boolean') {
             nextStatus.lowImages = lowImages;
+        }
+        if (typeof betterView === 'boolean') {
+            nextStatus.betterView = betterView;
+            // Track who clicked and when
+            if (betterView) {
+                let markedBy = 'Unknown';
+                // Try to get user name from userData by email (JWT token contains email)
+                if (req.user && req.user.email) {
+                    const users = userData.getAllItems();
+                    const user = users.find(u => u.email === req.user.email);
+                    if (user) {
+                        markedBy = user.name || user._id || 'Unknown';
+                    }
+                }
+                // Fallback: try direct fields from req.user
+                if (markedBy === 'Unknown' && req.user) {
+                    markedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
+                }
+                nextStatus.betterViewMarkedBy = markedBy;
+                nextStatus.betterViewMarkedAt = new Date().toISOString();
+                // Clear removal tracking when marking as better view
+                nextStatus.betterViewRemovedBy = undefined;
+                nextStatus.betterViewRemovedAt = undefined;
+            } else {
+                // Track who removed and when
+                let removedBy = 'Unknown';
+                // Try to get user name from userData by email (JWT token contains email)
+                if (req.user && req.user.email) {
+                    const users = userData.getAllItems();
+                    const user = users.find(u => u.email === req.user.email);
+                    if (user) {
+                        removedBy = user.name || user._id || 'Unknown';
+                    }
+                }
+                // Fallback: try direct fields from req.user
+                if (removedBy === 'Unknown' && req.user) {
+                    removedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
+                }
+                nextStatus.betterViewRemovedBy = removedBy;
+                nextStatus.betterViewRemovedAt = new Date().toISOString();
+                // Keep the original marking info for history
+                // Don't clear betterViewMarkedBy and betterViewMarkedAt
+            }
         }
 
         const updatedCamera = cameraData.updateItem(req.params.id, {

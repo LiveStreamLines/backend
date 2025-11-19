@@ -45,30 +45,9 @@ function addUser(req, res) {
         }
     });
     
-    // Handle canManageDevProjCam as a string ('all', 'camera_configuration', or empty string)
-    // Always ensure the field is set, even if empty
-    if (newUser.canManageDevProjCam !== undefined && newUser.canManageDevProjCam !== null && newUser.canManageDevProjCam !== '') {
-        if (typeof newUser.canManageDevProjCam === 'string') {
-            // Keep as string if it's 'all' or 'camera_configuration', otherwise set to empty string
-            if (newUser.canManageDevProjCam !== 'all' && newUser.canManageDevProjCam !== 'camera_configuration') {
-                newUser.canManageDevProjCam = '';
-            }
-        } else {
-            // Legacy: if it's a boolean true, convert to 'all' for backward compatibility
-            if (newUser.canManageDevProjCam === true) {
-                newUser.canManageDevProjCam = 'all';
-            } else {
-                newUser.canManageDevProjCam = '';
-            }
-        }
-    } else {
-        // Set to empty string if undefined, null, or empty string
-        newUser.canManageDevProjCam = '';
-    }
-    
     // Parse boolean fields from strings (FormData sends booleans as strings 'true'/'false')
     const booleanFields = [
-        'hasUaeAccess', 'hasSaudiAccess', 'hasCameraMonitorAccess',
+        'hasUaeAccess', 'hasSaudiAccess', 'canManageDevProjCam', 'hasCameraMonitorAccess',
         'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
         'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
         'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canAssignUnassignUser',
@@ -140,30 +119,9 @@ function updateUser(req, res) {
         }
     });
     
-    // Handle canManageDevProjCam as a string ('all', 'camera_configuration', or empty string)
-    // Always ensure the field is set, even if empty
-    if (updatePayload.canManageDevProjCam !== undefined && updatePayload.canManageDevProjCam !== null && updatePayload.canManageDevProjCam !== '') {
-        if (typeof updatePayload.canManageDevProjCam === 'string') {
-            // Keep as string if it's 'all' or 'camera_configuration', otherwise set to empty string
-            if (updatePayload.canManageDevProjCam !== 'all' && updatePayload.canManageDevProjCam !== 'camera_configuration') {
-                updatePayload.canManageDevProjCam = '';
-            }
-        } else {
-            // Legacy: if it's a boolean true, convert to 'all' for backward compatibility
-            if (updatePayload.canManageDevProjCam === true) {
-                updatePayload.canManageDevProjCam = 'all';
-            } else {
-                updatePayload.canManageDevProjCam = '';
-            }
-        }
-    } else {
-        // Set to empty string if undefined, null, or empty string
-        updatePayload.canManageDevProjCam = '';
-    }
-    
     // Parse boolean fields from strings (FormData sends booleans as strings 'true'/'false')
     const booleanFields = [
-        'hasUaeAccess', 'hasSaudiAccess', 'hasCameraMonitorAccess',
+        'hasUaeAccess', 'hasSaudiAccess', 'canManageDevProjCam', 'hasCameraMonitorAccess',
         'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
         'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
         'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canAssignUnassignUser',

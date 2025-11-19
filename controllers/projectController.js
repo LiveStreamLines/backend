@@ -7,6 +7,67 @@ const salesOrderData = require('../models/salesOrderData');
 const multer = require('multer');
 const DataModel = require('../models/DataModel');
 
+const MEDIA_ROOT = process.env.MEDIA_PATH || path.join(__dirname, '../media');
+const PROJECT_ATTACHMENTS_DIR = path.join(MEDIA_ROOT, 'attachments/projects');
+const TEMP_ATTACHMENT_DIR = path.join(PROJECT_ATTACHMENTS_DIR, 'temp');
+
+const ensureDirectory = (dirPath) => {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+};
+
+ensureDirectory(PROJECT_ATTACHMENTS_DIR);
+ensureDirectory(TEMP_ATTACHMENT_DIR);
+
+const generateAttachmentId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
+const getUploadedBy = (user) => {
+    if (!user) {
+        return 'system';
+    }
+    return user._id || user.id || user.userId || user.email || user.name || 'system';
+};
+
+const moveInternalAttachments = (projectId, files = [], user) => {
+    if (!files || files.length === 0) {
+        return [];
+    }
+
+    const attachmentsDir = path.join(PROJECT_ATTACHMENTS_DIR, projectId);
+    ensureDirectory(attachmentsDir);
+
+    const uploadedBy = getUploadedBy(user);
+    const attachments = [];
+
+    files.forEach((file) => {
+        const newFileName = `${projectId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+        const targetPath = path.join(attachmentsDir, newFileName);
+        try {
+            fs.renameSync(file.path, targetPath);
+            attachments.push({
+                _id: generateAttachmentId(),
+                name: newFileName,
+                originalName: file.originalname,
+                size: file.size,
+                type: file.mimetype,
+                url: `/media/attachments/projects/${projectId}/${newFileName}`,
+                uploadedAt: new Date().toISOString(),
+                uploadedBy,
+            });
+        } catch (error) {
+            logger.error('Failed to move internal attachment', error);
+            try {
+                fs.unlinkSync(file.path);
+            } catch (unlinkError) {
+                logger.warn('Failed to clean up temp attachment', unlinkError);
+            }
+        }
+    });
+
+    return attachments;
+};
+
 // Get base URL for attachments (for remote deployment)
 const getAttachmentBaseUrl = () => {
     // Use environment variable or default to /backend for production
@@ -74,57 +135,92 @@ function getProjectByTag(req, res) {
 
 // Controller for adding a new Project
 function addProject(req, res) {
-    const newProject = req.body;
+    try {
+        const payload = {
+            ...req.body,
+            internalDescription: req.body.internalDescription || '',
+            internalAttachments: [],
+        };
 
-    // Check if developer exists
-    const developer = developerData.getItemById(newProject.developer);
-    if (!developer) {
-        return res.status(400).json({ message: 'Invalid developer ID' });
-    }
+        // Check if developer exists
+        const developer = developerData.getItemById(payload.developer);
+        if (!developer) {
+            return res.status(400).json({ message: 'Invalid developer ID' });
+        }
 
-    const addedProject = projectData.addItem(newProject);
+        const addedProject = projectData.addItem(payload);
+        let response = addedProject;
 
-    if (req.file) {
-        const imageFileName = `${addedProject._id}${path.extname(req.file.originalname)}`;
-        const imageFilePath = path.join(process.env.MEDIA_PATH, 'logos/project/', imageFileName);
+        const logoFile = req.files?.logo?.[0];
+        if (logoFile) {
+            const logoFileName = `${addedProject._id}${path.extname(logoFile.originalname)}`;
+            const logoFilePath = path.join(process.env.MEDIA_PATH, 'logos/project/', logoFileName);
+            fs.renameSync(logoFile.path, logoFilePath);
+            response = projectData.updateItem(addedProject._id, { logo: `logos/project/${logoFileName}` }) || response;
+        } else {
+            response = projectData.updateItem(addedProject._id, { logo: `` }) || response;
+        }
 
-        fs.rename(req.file.path, imageFilePath, (err) => {
-            if (err) {
-                logger.error('Error saving file:', err);
-                return res.status(500).json({ message: 'Failed to save file' });
+        const attachmentFiles = req.files?.internalAttachments || [];
+        if (attachmentFiles.length > 0) {
+            const attachments = moveInternalAttachments(addedProject._id, attachmentFiles, req.user);
+            if (attachments.length > 0) {
+                response = projectData.updateItem(addedProject._id, { internalAttachments: attachments }) || response;
             }
-            const final = projectData.updateItem(addedProject._id, { logo: `logos/project/${imageFileName}` });
-            return res.status(201).json(final);
-        });
-    } else {
-        const final = projectData.updateItem(addedProject._id, { logo: `` });
-        return res.status(201).json(final);
+        }
+
+        return res.status(201).json(response);
+    } catch (error) {
+        logger.error('Error adding project', error);
+        return res.status(500).json({ message: 'Failed to add project' });
     }
 }
 
 // Controller for updating a Project
 function updateProject(req, res) {
-    const updatedData = req.body;
-    const projectId = req.params.id;
+    try {
+        const projectId = req.params.id;
+        const updatedData = {
+            ...req.body,
+            internalDescription: req.body.internalDescription || '',
+        };
+        delete updatedData.internalAttachments;
 
-    // Check if developer exists
-    if (updatedData.developerId) {
-        const developer = developerData.getItemById(updatedData.developerId);
-        if (!developer) {
-            return res.status(400).json({ message: 'Invalid developer ID' });
+        // Check if developer exists
+        if (updatedData.developer) {
+            const developer = developerData.getItemById(updatedData.developer);
+            if (!developer) {
+                return res.status(400).json({ message: 'Invalid developer ID' });
+            }
         }
-    }
 
-    const updatedProject = projectData.updateItem(projectId, updatedData);
+        let updatedProject = projectData.updateItem(projectId, updatedData);
 
-    if (updatedProject) {
-        if (req.file) {
-            const imageFileName = `${projectId}${path.extname(req.file.originalname)}`;
-            projectData.updateItem(projectId, { logo: `logos/project/${imageFileName}` });
+        if (!updatedProject) {
+            return res.status(404).json({ message: 'Project not found' });
         }
-        res.json(updatedProject);
-    } else {
-        res.status(404).json({ message: 'Project not found' });
+
+        const logoFile = req.files?.logo?.[0];
+        if (logoFile) {
+            const logoFileName = `${projectId}${path.extname(logoFile.originalname)}`;
+            const logoFilePath = path.join(process.env.MEDIA_PATH, 'logos/project/', logoFileName);
+            fs.renameSync(logoFile.path, logoFilePath);
+            updatedProject = projectData.updateItem(projectId, { logo: `logos/project/${logoFileName}` }) || updatedProject;
+        }
+
+        const attachmentFiles = req.files?.internalAttachments || [];
+        if (attachmentFiles.length > 0) {
+            const attachments = moveInternalAttachments(projectId, attachmentFiles, req.user);
+            if (attachments.length > 0) {
+                const merged = [...(updatedProject.internalAttachments || []), ...attachments];
+                updatedProject = projectData.updateItem(projectId, { internalAttachments: merged }) || updatedProject;
+            }
+        }
+
+        return res.json(updatedProject);
+    } catch (error) {
+        logger.error('Error updating project', error);
+        return res.status(500).json({ message: 'Failed to update project' });
     }
 }
 
@@ -289,6 +385,69 @@ function deleteProjectAttachment(req, res) {
     }
 }
 
+// Controller for deleting an internal attachment
+function deleteInternalAttachment(req, res) {
+    try {
+        const projectId = req.params.id;
+        const attachmentId = req.params.attachmentId;
+
+        const project = projectData.getItemById(projectId);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        const attachments = project.internalAttachments || [];
+        const attachmentIndex = attachments.findIndex(att => att._id === attachmentId);
+
+        if (attachmentIndex === -1) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = attachments[attachmentIndex];
+        
+        // Delete the physical file if it exists
+        if (attachment.url) {
+            try {
+                // Extract file path from URL (e.g., /media/attachments/projects/{projectId}/{fileName})
+                let urlPath = attachment.url;
+                if (urlPath.startsWith('/media/')) {
+                    urlPath = urlPath.replace('/media/', '');
+                } else if (urlPath.startsWith('media/')) {
+                    urlPath = urlPath.replace('media/', '');
+                } else if (urlPath.startsWith('/')) {
+                    urlPath = urlPath.slice(1);
+                }
+                const filePath = path.join(MEDIA_ROOT, urlPath);
+                
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    logger.info(`Deleted internal attachment file: ${filePath}`);
+                } else {
+                    logger.warn(`Internal attachment file not found: ${filePath}`);
+                }
+            } catch (fileError) {
+                logger.warn(`Failed to delete internal attachment file: ${fileError.message}`);
+                // Continue with database deletion even if file deletion fails
+            }
+        }
+
+        // Remove attachment from array
+        const updatedAttachments = attachments.filter(att => att._id !== attachmentId);
+        const updatedProject = projectData.updateItem(projectId, { 
+            internalAttachments: updatedAttachments 
+        });
+
+        if (updatedProject) {
+            return res.json(updatedProject);
+        } else {
+            return res.status(500).json({ message: 'Failed to update project' });
+        }
+    } catch (error) {
+        logger.error('Error deleting internal attachment', error);
+        return res.status(500).json({ message: 'Failed to delete internal attachment' });
+    }
+}
+
 module.exports = {
     getAllProjects,
     getProjectById,
@@ -302,5 +461,6 @@ module.exports = {
     getAvailableProjectsForSalesOrder,
     uploadProjectAttachment,
     getProjectAttachments,
-    deleteProjectAttachment
+    deleteProjectAttachment,
+    deleteInternalAttachment
 };

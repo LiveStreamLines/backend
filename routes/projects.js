@@ -10,16 +10,42 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Configure multer for file upload (project logos)
+const ensureDir = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
+
+// Configure multer for logo and internal attachments
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, process.env.MEDIA_PATH + '/logos/project'); // Directory for project images
-    },
-    filename: (req, file, cb) => {
-        const projectId = req.params.id || req.body.id; // Use id from params if updating, or from body if adding
-        const ext = path.extname(file.originalname);     // Preserve file extension
-        cb(null, `${projectId}${ext}`);                 // Rename file as projectId.ext
+  destination: (req, file, cb) => {
+    if (file.fieldname === 'logo') {
+      const logoDir = path.join(process.env.MEDIA_PATH, 'logos/project');
+      ensureDir(logoDir);
+      cb(null, logoDir);
+      return;
     }
+    if (file.fieldname === 'internalAttachments') {
+      const tempDir = path.join(process.env.MEDIA_PATH, 'attachments/projects/temp');
+      ensureDir(tempDir);
+      cb(null, tempDir);
+      return;
+    }
+    const fallbackDir = path.join(process.env.MEDIA_PATH, 'uploads/tmp');
+    ensureDir(fallbackDir);
+    cb(null, fallbackDir);
+  },
+  filename: (req, file, cb) => {
+    if (file.fieldname === 'logo') {
+      const projectId = req.params.id || req.body.id;
+      const ext = path.extname(file.originalname);
+      cb(null, `${projectId}${ext}`);
+      return;
+    }
+    const ext = path.extname(file.originalname);
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${ext}`);
+  },
 });
 
 // Configure multer for attachment uploads
@@ -44,6 +70,10 @@ const attachmentStorage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+const uploadFields = upload.fields([
+  { name: 'logo', maxCount: 1 },
+  { name: 'internalAttachments', maxCount: 10 },
+]);
 const attachmentUpload = multer({ 
     storage: attachmentStorage,
     limits: {
@@ -57,13 +87,16 @@ router.get('/dev/:id', projectController.getProjectByDeveloper);
 router.get('/devTag/:tag', projectController.getProjectByDeveloperTag);
 router.get('/tag/:tag', projectController.getProjectByTag);
 router.get('/:id', projectController.getProjectById);
-router.post('/', upload.single('logo'),projectController.addProject);
-router.put('/:id', upload.single('logo'), projectController.updateProject);
+router.post('/', uploadFields, projectController.addProject);
+router.put('/:id', uploadFields, projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
 
 // Attachment routes
 router.post('/:projectId/attachments', attachmentUpload.single('file'), projectController.uploadProjectAttachment);
 router.get('/:projectId/attachments', projectController.getProjectAttachments);
 router.delete('/:projectId/attachments/:attachmentId', projectController.deleteProjectAttachment);
+
+// Internal attachment routes
+router.delete('/:id/internal-attachments/:attachmentId', projectController.deleteInternalAttachment);
 
 module.exports = router;

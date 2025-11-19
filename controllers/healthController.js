@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('../logger');
+const MemoryData = require('../models/memoryData');
 
 // Define the root directory for camera pictures
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
@@ -111,7 +112,12 @@ function cameraHealth(req, res) {
 
     logger.info(`Camera health check for developerId: ${developerId}, projectId: ${projectId}, cameraId: ${cameraId}`);
 
-    res.status(200).json({
+    // Check if there's an assigned memory for this camera
+    // The parameters are actually tags/names, not IDs
+    const memories = MemoryData.findMemory(developerId, projectId, cameraId);
+    const memory = memories && memories.length > 0 ? memories[0] : null;
+    
+    const response = {
       developerId,
       projectId,
       cameraId,
@@ -128,7 +134,18 @@ function cameraHealth(req, res) {
         count: thirdDayCount
       },
       totalImages: firstDayCount + secondDayCount + thirdDayCount
-    });
+    };
+
+    // Include memory information if memory is assigned
+    if (memory) {
+      response.hasMemoryAssigned = true;
+      response.memoryAvailable = memory.memoryAvailable || null;
+    } else {
+      response.hasMemoryAssigned = false;
+      response.memoryAvailable = null;
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     logger.error('Camera health check error:', error);
     res.status(500).json({

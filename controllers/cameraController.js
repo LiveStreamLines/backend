@@ -209,10 +209,28 @@ function updateCameraMaintenanceStatus(req, res) {
                 }
                 nextStatus.photoDirtyMarkedBy = markedBy;
                 nextStatus.photoDirtyMarkedAt = new Date().toISOString();
+                // Clear removal tracking when marking as dirty
+                nextStatus.photoDirtyRemovedBy = undefined;
+                nextStatus.photoDirtyRemovedAt = undefined;
             } else {
-                // Clear tracking info when unmarking
-                nextStatus.photoDirtyMarkedBy = undefined;
-                nextStatus.photoDirtyMarkedAt = undefined;
+                // Track who removed and when
+                let removedBy = 'Unknown';
+                // Try to get user name from userData by email (JWT token contains email)
+                if (req.user && req.user.email) {
+                    const users = userData.getAllItems();
+                    const user = users.find(u => u.email === req.user.email);
+                    if (user) {
+                        removedBy = user.name || user._id || 'Unknown';
+                    }
+                }
+                // Fallback: try direct fields from req.user
+                if (removedBy === 'Unknown' && req.user) {
+                    removedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
+                }
+                nextStatus.photoDirtyRemovedBy = removedBy;
+                nextStatus.photoDirtyRemovedAt = new Date().toISOString();
+                // Keep the original marking info for history
+                // Don't clear photoDirtyMarkedBy and photoDirtyMarkedAt
             }
         }
         if (typeof lowImages === 'boolean') {

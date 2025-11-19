@@ -153,12 +153,70 @@ const maintenanceController = {
     // Update maintenance request
     updateMaintenance: (req, res) => {
         try {
-            const maintenance = maintenanceData.updateItem(req.params.id, req.body);
+            const taskId = req.params.id;
+            const existingTask = maintenanceData.getItemById(taskId);
+            if (!existingTask) {
+                return res.status(404).json({ message: 'Maintenance request not found' });
+            }
+
+            // Prepare update data from request body
+            const updateData = { ...req.body };
+            
+            // Handle file attachments if any
+            if (req.files && req.files.length > 0) {
+                try {
+                    // Create task-specific directory for attachments if it doesn't exist
+                    const taskAttachmentsDir = path.join(process.env.MEDIA_PATH, 'attachments/maintenance', taskId);
+                    if (!fs.existsSync(taskAttachmentsDir)) {
+                        fs.mkdirSync(taskAttachmentsDir, { recursive: true });
+                    }
+                    
+                    const dataModel = new DataModel('temp');
+                    const newAttachments = [];
+                    
+                    // Move files from temp directory to task-specific directory
+                    for (const file of req.files) {
+                        const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+                        const newFilePath = path.join(taskAttachmentsDir, newFileName);
+                        
+                        // Move file from temp location to task directory
+                        if (fs.existsSync(file.path)) {
+                            fs.renameSync(file.path, newFilePath);
+                            
+                            // Create attachment object
+                            const attachment = {
+                                _id: dataModel.generateCustomId(),
+                                name: newFileName,
+                                originalName: file.originalname,
+                                size: file.size,
+                                type: file.mimetype,
+                                url: `/media/attachments/maintenance/${taskId}/${newFileName}`,
+                                uploadedAt: new Date().toISOString(),
+                                uploadedBy: req.user?.id || req.user?._id || 'system'
+                            };
+                            
+                            newAttachments.push(attachment);
+                        }
+                    }
+                    
+                    // Merge new attachments with existing ones
+                    const existingAttachments = existingTask.attachments || [];
+                    updateData.attachments = [...existingAttachments, ...newAttachments];
+                } catch (fileError) {
+                    logger.error('Error processing attachments during update:', fileError);
+                    // Continue with update even if file processing fails
+                }
+            }
+            
+            // Update the maintenance task
+            const maintenance = maintenanceData.updateItem(taskId, updateData);
             if (!maintenance) {
                 return res.status(404).json({ message: 'Maintenance request not found' });
             }
+            
             res.json(maintenance);
         } catch (error) {
+            logger.error('Error updating maintenance task', error);
             res.status(500).json({ message: error.message });
         }
     },

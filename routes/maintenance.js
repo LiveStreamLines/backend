@@ -49,8 +49,8 @@ router.get('/:id', maintenanceController.getMaintenanceById);
 // Create new maintenance request (with optional file attachments)
 router.post('/', attachmentUpload.array('attachments', 10), maintenanceController.createMaintenance);
 
-// Update maintenance request
-router.put('/:id', maintenanceController.updateMaintenance);
+// Update maintenance request (with optional file attachments)
+router.put('/:id', attachmentUpload.array('attachments', 10), maintenanceController.updateMaintenance);
 
 // Delete maintenance request
 router.delete('/:id', maintenanceController.deleteMaintenance);

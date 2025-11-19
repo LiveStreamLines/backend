@@ -124,7 +124,8 @@ const maintenanceController = {
                                 type: file.mimetype,
                                 url: `/media/attachments/maintenance/${taskId}/${newFileName}`,
                                 uploadedAt: new Date().toISOString(),
-                                uploadedBy: taskData.addedUserId || req.user?.id || 'system'
+                                uploadedBy: taskData.addedUserId || req.user?.id || 'system',
+                                context: 'assignment' // Attachments uploaded during task creation
                             };
                             
                             attachments.push(attachment);
@@ -162,6 +163,14 @@ const maintenanceController = {
             // Prepare update data from request body
             const updateData = { ...req.body };
             
+            // Determine attachment context based on update type
+            // If status is being set to 'completed' (or task is already completed), these are completion attachments
+            // Otherwise, they're assignment/update attachments
+            // Note: FormData sends all fields as strings, so we check string values
+            const newStatus = updateData.status ? String(updateData.status).toLowerCase() : null;
+            const isCompletion = newStatus === 'completed' || existingTask.status === 'completed';
+            const attachmentContext = isCompletion ? 'completion' : 'assignment';
+            
             // Handle file attachments if any
             if (req.files && req.files.length > 0) {
                 try {
@@ -192,7 +201,8 @@ const maintenanceController = {
                                 type: file.mimetype,
                                 url: `/media/attachments/maintenance/${taskId}/${newFileName}`,
                                 uploadedAt: new Date().toISOString(),
-                                uploadedBy: req.user?.id || req.user?._id || 'system'
+                                uploadedBy: req.user?.id || req.user?._id || 'system',
+                                context: attachmentContext // 'assignment' or 'completion'
                             };
                             
                             newAttachments.push(attachment);

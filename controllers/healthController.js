@@ -106,6 +106,12 @@ function cameraHealth(req, res) {
     const secondDayCount = countImagesForDay(twoDaysAgoStr);
     const thirdDayCount = countImagesForDay(threeDaysAgoStr);
 
+    // Check for images with wrong time (images starting with "2000")
+    const hasWrongTime = files.some(file => {
+      const fileTimestamp = file.replace('.jpg', '');
+      return fileTimestamp.startsWith('2000');
+    });
+
     // Format date for display (YYYY-MM-DD)
     const formatDateDisplay = (date) => {
       const year = date.getFullYear();
@@ -137,7 +143,8 @@ function cameraHealth(req, res) {
         date: formatDateDisplay(threeDaysAgo),
         count: thirdDayCount
       },
-      totalImages: firstDayCount + secondDayCount + thirdDayCount
+      totalImages: firstDayCount + secondDayCount + thirdDayCount,
+      hasWrongTime: hasWrongTime
     };
 
     // Include memory information if memory is assigned
@@ -215,10 +222,53 @@ function cameraHealth(req, res) {
 
           logger.info(`Auto-updated lowImages status for camera ${camera.camera}: ${shouldBeLowImages ? 'ON' : 'OFF'} (yesterday's count: ${firstDayCount})`);
         }
+
+        // Automatically update wrongTime status based on images starting with "2000"
+        const currentlyWrongTime = !!currentStatus.wrongTime;
+        if (hasWrongTime !== currentlyWrongTime) {
+          const nextStatus = { ...currentStatus };
+          const now = new Date().toISOString();
+          
+          if (hasWrongTime) {
+            // Marking as wrong time - set the marking date only if not already set
+            nextStatus.wrongTime = true;
+            if (!nextStatus.wrongTimeMarkedAt) {
+              nextStatus.wrongTimeMarkedBy = 'System';
+              nextStatus.wrongTimeMarkedAt = now;
+            }
+            // Clear removal tracking when marking
+            nextStatus.wrongTimeRemovedBy = undefined;
+            nextStatus.wrongTimeRemovedAt = undefined;
+          } else {
+            // Clearing wrong time - track who cleared and when
+            nextStatus.wrongTime = false;
+            nextStatus.wrongTimeRemovedBy = 'System';
+            nextStatus.wrongTimeRemovedAt = now;
+            // Keep the original marking info for history
+          }
+
+          // Update the camera
+          cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
+
+          // Log the status change in history
+          cameraStatusHistoryController.recordStatusChange({
+            cameraId: camera._id,
+            cameraName: camera.camera,
+            developerId: camera.developer,
+            projectId: camera.project,
+            statusType: 'wrongTime',
+            action: hasWrongTime ? 'on' : 'off',
+            performedBy: 'System',
+            performedByEmail: 'system@auto',
+            performedAt: now,
+          });
+
+          logger.info(`Auto-updated wrongTime status for camera ${camera.camera}: ${hasWrongTime ? 'ON' : 'OFF'}`);
+        }
       }
     } catch (updateError) {
       // Log error but don't fail the health check
-      logger.error('Error auto-updating lowImages status:', updateError);
+      logger.error('Error auto-updating camera status:', updateError);
     }
 
     res.status(200).json(response);

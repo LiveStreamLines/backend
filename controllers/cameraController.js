@@ -205,12 +205,13 @@ function updateCamera(req, res) {
 // Allows toggling backend-persisted flags like:
 // - maintenanceStatus.photoDirty
 // - maintenanceStatus.lowImages (e.g. "Maintenance / less image number")
+// - maintenanceStatus.wrongTime (images with incorrect timestamp)
 function updateCameraMaintenanceStatus(req, res) {
     try {
-        const { photoDirty, lowImages, betterView } = req.body || {};
+        const { photoDirty, lowImages, betterView, wrongTime } = req.body || {};
         
         // Ensure at least one field is provided
-        if (photoDirty === undefined && lowImages === undefined && betterView === undefined) {
+        if (photoDirty === undefined && lowImages === undefined && betterView === undefined && wrongTime === undefined) {
             return res.status(400).json({ message: 'No maintenance status fields provided.' });
         }
 
@@ -353,6 +354,52 @@ function updateCameraMaintenanceStatus(req, res) {
                 });
                 // Keep the original marking info for history
                 // Don't clear betterViewMarkedBy and betterViewMarkedAt
+            }
+        }
+        if (typeof wrongTime === 'boolean') {
+            nextStatus.wrongTime = wrongTime;
+            // Track who clicked and when
+            if (wrongTime) {
+                const markedBy = userIdentity.name;
+                const markedAt = new Date().toISOString();
+                // Only set marking date if not already set (preserve original marking date)
+                if (!nextStatus.wrongTimeMarkedAt) {
+                    nextStatus.wrongTimeMarkedBy = markedBy;
+                    nextStatus.wrongTimeMarkedAt = markedAt;
+                }
+                // Clear removal tracking when marking
+                nextStatus.wrongTimeRemovedBy = undefined;
+                nextStatus.wrongTimeRemovedAt = undefined;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'wrongTime',
+                    action: 'on',
+                    performedBy: markedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: markedAt,
+                });
+            } else {
+                // Track who removed and when
+                const removedBy = userIdentity.name;
+                const removedAt = new Date().toISOString();
+                nextStatus.wrongTimeRemovedBy = removedBy;
+                nextStatus.wrongTimeRemovedAt = removedAt;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'wrongTime',
+                    action: 'off',
+                    performedBy: removedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: removedAt,
+                });
+                // Keep the original marking info for history
+                // Don't clear wrongTimeMarkedBy and wrongTimeMarkedAt
             }
         }
 

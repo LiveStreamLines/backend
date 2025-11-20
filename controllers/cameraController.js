@@ -5,8 +5,35 @@ const developerData = require('../models/developerData');
 const projectData = require("../models/projectData");
 const userData = require('../models/userData');
 const logger = require('../logger');
+const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
+
+function resolveUserIdentity(req) {
+    let resolvedName = 'Unknown';
+    let resolvedId = null;
+    const resolvedEmail = req.user?.email ?? null;
+
+    if (req.user && req.user.email) {
+        const users = userData.getAllItems();
+        const user = users.find(u => u.email === req.user.email);
+        if (user) {
+            resolvedName = user.name || user._id || 'Unknown';
+            resolvedId = user._id || user.id || null;
+        }
+    }
+
+    if (resolvedName === 'Unknown' && req.user) {
+        resolvedName = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
+        resolvedId = resolvedId || req.user._id || req.user.id || req.user.userId || null;
+    }
+
+    return {
+        name: resolvedName,
+        id: resolvedId,
+        email: resolvedEmail,
+    };
+}
 
 
 // Controller for getting all Cameras
@@ -189,46 +216,47 @@ function updateCameraMaintenanceStatus(req, res) {
 
         const currentStatus = camera.maintenanceStatus || {};
         const nextStatus = { ...currentStatus };
+        const userIdentity = resolveUserIdentity(req);
 
         if (typeof photoDirty === 'boolean') {
             nextStatus.photoDirty = photoDirty;
             // Track who clicked and when
             if (photoDirty) {
-                let markedBy = 'Unknown';
-                // Try to get user name from userData by email (JWT token contains email)
-                if (req.user && req.user.email) {
-                    const users = userData.getAllItems();
-                    const user = users.find(u => u.email === req.user.email);
-                    if (user) {
-                        markedBy = user.name || user._id || 'Unknown';
-                    }
-                }
-                // Fallback: try direct fields from req.user
-                if (markedBy === 'Unknown' && req.user) {
-                    markedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
-                }
+                const markedBy = userIdentity.name;
+                const markedAt = new Date().toISOString();
                 nextStatus.photoDirtyMarkedBy = markedBy;
-                nextStatus.photoDirtyMarkedAt = new Date().toISOString();
+                nextStatus.photoDirtyMarkedAt = markedAt;
                 // Clear removal tracking when marking as dirty
                 nextStatus.photoDirtyRemovedBy = undefined;
                 nextStatus.photoDirtyRemovedAt = undefined;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'photoDirty',
+                    action: 'on',
+                    performedBy: markedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: markedAt,
+                });
             } else {
                 // Track who removed and when
-                let removedBy = 'Unknown';
-                // Try to get user name from userData by email (JWT token contains email)
-                if (req.user && req.user.email) {
-                    const users = userData.getAllItems();
-                    const user = users.find(u => u.email === req.user.email);
-                    if (user) {
-                        removedBy = user.name || user._id || 'Unknown';
-                    }
-                }
-                // Fallback: try direct fields from req.user
-                if (removedBy === 'Unknown' && req.user) {
-                    removedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
-                }
+                const removedBy = userIdentity.name;
+                const removedAt = new Date().toISOString();
                 nextStatus.photoDirtyRemovedBy = removedBy;
-                nextStatus.photoDirtyRemovedAt = new Date().toISOString();
+                nextStatus.photoDirtyRemovedAt = removedAt;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'photoDirty',
+                    action: 'off',
+                    performedBy: removedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: removedAt,
+                });
                 // Keep the original marking info for history
                 // Don't clear photoDirtyMarkedBy and photoDirtyMarkedAt
             }
@@ -240,41 +268,41 @@ function updateCameraMaintenanceStatus(req, res) {
             nextStatus.betterView = betterView;
             // Track who clicked and when
             if (betterView) {
-                let markedBy = 'Unknown';
-                // Try to get user name from userData by email (JWT token contains email)
-                if (req.user && req.user.email) {
-                    const users = userData.getAllItems();
-                    const user = users.find(u => u.email === req.user.email);
-                    if (user) {
-                        markedBy = user.name || user._id || 'Unknown';
-                    }
-                }
-                // Fallback: try direct fields from req.user
-                if (markedBy === 'Unknown' && req.user) {
-                    markedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
-                }
+                const markedBy = userIdentity.name;
+                const markedAt = new Date().toISOString();
                 nextStatus.betterViewMarkedBy = markedBy;
-                nextStatus.betterViewMarkedAt = new Date().toISOString();
+                nextStatus.betterViewMarkedAt = markedAt;
                 // Clear removal tracking when marking as better view
                 nextStatus.betterViewRemovedBy = undefined;
                 nextStatus.betterViewRemovedAt = undefined;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'betterView',
+                    action: 'on',
+                    performedBy: markedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: markedAt,
+                });
             } else {
                 // Track who removed and when
-                let removedBy = 'Unknown';
-                // Try to get user name from userData by email (JWT token contains email)
-                if (req.user && req.user.email) {
-                    const users = userData.getAllItems();
-                    const user = users.find(u => u.email === req.user.email);
-                    if (user) {
-                        removedBy = user.name || user._id || 'Unknown';
-                    }
-                }
-                // Fallback: try direct fields from req.user
-                if (removedBy === 'Unknown' && req.user) {
-                    removedBy = req.user.name || req.user.userName || req.user._id || req.user.id || req.user.userId || 'Unknown';
-                }
+                const removedBy = userIdentity.name;
+                const removedAt = new Date().toISOString();
                 nextStatus.betterViewRemovedBy = removedBy;
-                nextStatus.betterViewRemovedAt = new Date().toISOString();
+                nextStatus.betterViewRemovedAt = removedAt;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'betterView',
+                    action: 'off',
+                    performedBy: removedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: removedAt,
+                });
                 // Keep the original marking info for history
                 // Don't clear betterViewMarkedBy and betterViewMarkedAt
             }

@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../logger');
 const MemoryData = require('../models/memoryData');
+const cameraData = require('../models/cameraData');
+const developerData = require('../models/developerData');
+const projectData = require('../models/projectData');
+const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 
 // Define the root directory for camera pictures
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
@@ -143,6 +147,60 @@ function cameraHealth(req, res) {
     } else {
       response.hasMemoryAssigned = false;
       response.memoryAvailable = null;
+    }
+
+    // Automatically update lowImages status based on yesterday's image count
+    // If yesterday's count < 40, set lowImages = true, otherwise set it to false
+    try {
+      const cameras = cameraData.getAllItems();
+      const developers = developerData.getAllItems();
+      const projects = projectData.getAllItems();
+
+      // Find camera by matching developer tag, project tag, and camera name
+      const camera = cameras.find(cam => {
+        const dev = developers.find(d => d._id === cam.developer);
+        const proj = projects.find(p => p._id === cam.project);
+        if (!dev || !proj) return false;
+        
+        const devTagMatch = (dev.developerTag || '').toString().trim().toLowerCase() === developerId.toLowerCase();
+        const projTagMatch = (proj.projectTag || '').toString().trim().toLowerCase() === projectId.toLowerCase();
+        const cameraNameMatch = (cam.camera || '').toString().trim().toLowerCase() === cameraId.toLowerCase();
+        
+        return devTagMatch && projTagMatch && cameraNameMatch;
+      });
+
+      if (camera) {
+        const currentStatus = camera.maintenanceStatus || {};
+        const shouldBeLowImages = firstDayCount < 40;
+        const currentlyLowImages = !!currentStatus.lowImages;
+
+        // Only update if the status needs to change
+        if (shouldBeLowImages !== currentlyLowImages) {
+          const nextStatus = { ...currentStatus };
+          nextStatus.lowImages = shouldBeLowImages;
+
+          // Update the camera
+          cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
+
+          // Log the status change in history
+          cameraStatusHistoryController.recordStatusChange({
+            cameraId: camera._id,
+            cameraName: camera.camera,
+            developerId: camera.developer,
+            projectId: camera.project,
+            statusType: 'lowImages',
+            action: shouldBeLowImages ? 'on' : 'off',
+            performedBy: 'System',
+            performedByEmail: 'system@auto',
+            performedAt: new Date().toISOString(),
+          });
+
+          logger.info(`Auto-updated lowImages status for camera ${camera.camera}: ${shouldBeLowImages ? 'ON' : 'OFF'} (yesterday's count: ${firstDayCount})`);
+        }
+      }
+    } catch (updateError) {
+      // Log error but don't fail the health check
+      logger.error('Error auto-updating lowImages status:', updateError);
     }
 
     res.status(200).json(response);

@@ -35,6 +35,11 @@ function resolveUserIdentity(req) {
     };
 }
 
+function getMaintenanceCycleStartDate(req, res) {
+    const cycleStartDate = process.env.MAINTENANCE_CYCLE_START_DATE || null;
+    res.json({ cycleStartDate });
+}
+
 
 // Controller for getting all Cameras
 function getAllCameras(req, res) {
@@ -443,5 +448,6 @@ module.exports = {
     updateCameraInstallationDate,
     updateCameraInvoiceInfo,
     updateCameraInvoicedDuration,
-    deleteCamera
+    deleteCamera,
+    getMaintenanceCycleStartDate,
 };

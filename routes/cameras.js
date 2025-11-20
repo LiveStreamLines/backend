@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 router.get('/', cameraController.getAllCameras);
 router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
+router.get('/maintenance-cycle/start-date', cameraController.getMaintenanceCycleStartDate);
 router.get('/:id', cameraController.getCameraById);
 router.get('/proj/:id', cameraController.getCameraByProject);   
 router.get('/projtag/:tag', cameraController.getCameraByProjectTag);

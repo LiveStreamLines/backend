@@ -154,14 +154,23 @@ function cameraHealth(req, res) {
       response.hasMemoryAssigned = true;
       response.memoryAvailable = memory.memoryAvailable || null;
       // Get shutter count from memory (check both field names)
-      shutterCount = memory.shuttercount ?? memory.shutterCount ?? null;
+      const rawShutterCount = memory.shuttercount ?? memory.shutterCount ?? null;
+      // Convert to number if it's a string or number
+      if (rawShutterCount !== null && rawShutterCount !== undefined) {
+        if (typeof rawShutterCount === 'number') {
+          shutterCount = rawShutterCount;
+        } else if (typeof rawShutterCount === 'string') {
+          const parsed = parseInt(rawShutterCount, 10);
+          shutterCount = isNaN(parsed) ? null : parsed;
+        }
+      }
     } else {
       response.hasMemoryAssigned = false;
       response.memoryAvailable = null;
     }
     
     // Check if shutter count exceeds 10,000 (shutter expiry)
-    const hasShutterExpiry = shutterCount !== null && typeof shutterCount === 'number' && shutterCount > 10000;
+    const hasShutterExpiry = shutterCount !== null && shutterCount > 10000;
 
     // Automatically update lowImages status based on yesterday's image count
     // If yesterday's count < 40, set lowImages = true, otherwise set it to false
@@ -182,6 +191,10 @@ function cameraHealth(req, res) {
         
         return devTagMatch && projTagMatch && cameraNameMatch;
       });
+
+      if (!camera) {
+        logger.warn(`Camera not found for health check: developerId=${developerId}, projectId=${projectId}, cameraId=${cameraId}`);
+      }
 
       if (camera) {
         const currentStatus = camera.maintenanceStatus || {};
@@ -275,6 +288,14 @@ function cameraHealth(req, res) {
 
         // Automatically update shutterExpiry status based on shutter count > 10000
         const currentlyShutterExpiry = !!currentStatus.shutterExpiry;
+        
+        // Log debug info for shutter expiry check
+        if (memory) {
+          logger.info(`Shutter expiry check for camera ${camera.camera}: shutterCount=${shutterCount}, hasShutterExpiry=${hasShutterExpiry}, currentlyShutterExpiry=${currentlyShutterExpiry}, memory.shuttercount=${memory.shuttercount}, memory.shutterCount=${memory.shutterCount}`);
+        } else {
+          logger.info(`Shutter expiry check for camera ${camera.camera}: No memory found, shutterCount=${shutterCount}`);
+        }
+        
         if (hasShutterExpiry !== currentlyShutterExpiry) {
           const nextStatus = { ...currentStatus };
           const now = new Date().toISOString();
@@ -313,7 +334,7 @@ function cameraHealth(req, res) {
             performedAt: now,
           });
 
-          logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: ${hasShutterExpiry ? 'ON' : 'OFF'} (shutter count: ${shutterCount})`);
+          logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: ${hasShutterExpiry ? 'ON' : 'OFF'} (shutter count: ${shutterCount}, memory: ${memory ? 'found' : 'not found'})`);
         }
       }
     } catch (updateError) {

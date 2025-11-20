@@ -127,6 +127,30 @@ function cameraHealth(req, res) {
     const memories = MemoryData.findMemory(developerId, projectId, cameraId);
     const memory = memories && memories.length > 0 ? memories[0] : null;
     
+    // Include memory information if memory is assigned
+    let shutterCount = null;
+    let hasMemoryAssigned = false;
+    let memoryAvailable = null;
+    
+    if (memory) {
+      hasMemoryAssigned = true;
+      memoryAvailable = memory.memoryAvailable || null;
+      // Get shutter count from memory (check both field names)
+      const rawShutterCount = memory.shuttercount ?? memory.shutterCount ?? null;
+      // Convert to number if it's a string or number
+      if (rawShutterCount !== null && rawShutterCount !== undefined) {
+        if (typeof rawShutterCount === 'number') {
+          shutterCount = rawShutterCount;
+        } else if (typeof rawShutterCount === 'string') {
+          const parsed = parseInt(rawShutterCount, 10);
+          shutterCount = isNaN(parsed) ? null : parsed;
+        }
+      }
+    }
+    
+    // Check if shutter count exceeds 10,000 (shutter expiry)
+    const hasShutterExpiry = shutterCount !== null && shutterCount > 10000;
+    
     const response = {
       developerId,
       projectId,
@@ -145,32 +169,10 @@ function cameraHealth(req, res) {
       },
       totalImages: firstDayCount + secondDayCount + thirdDayCount,
       hasWrongTime: hasWrongTime,
-      hasShutterExpiry: hasShutterExpiry
+      hasShutterExpiry: hasShutterExpiry,
+      hasMemoryAssigned: hasMemoryAssigned,
+      memoryAvailable: memoryAvailable
     };
-
-    // Include memory information if memory is assigned
-    let shutterCount = null;
-    if (memory) {
-      response.hasMemoryAssigned = true;
-      response.memoryAvailable = memory.memoryAvailable || null;
-      // Get shutter count from memory (check both field names)
-      const rawShutterCount = memory.shuttercount ?? memory.shutterCount ?? null;
-      // Convert to number if it's a string or number
-      if (rawShutterCount !== null && rawShutterCount !== undefined) {
-        if (typeof rawShutterCount === 'number') {
-          shutterCount = rawShutterCount;
-        } else if (typeof rawShutterCount === 'string') {
-          const parsed = parseInt(rawShutterCount, 10);
-          shutterCount = isNaN(parsed) ? null : parsed;
-        }
-      }
-    } else {
-      response.hasMemoryAssigned = false;
-      response.memoryAvailable = null;
-    }
-    
-    // Check if shutter count exceeds 10,000 (shutter expiry)
-    const hasShutterExpiry = shutterCount !== null && shutterCount > 10000;
 
     // Automatically update lowImages status based on yesterday's image count
     // If yesterday's count < 40, set lowImages = true, otherwise set it to false

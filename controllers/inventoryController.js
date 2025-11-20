@@ -33,10 +33,16 @@ module.exports = {
         try {
             const newItem = {
                 device: req.body.device,
-                status: 'available',
-                assignmentHistory: [],
+                status: req.body.status || 'available',
+                assignmentHistory: req.body.assignmentHistory || [],
                 validityDays: req.body.validityDays || 365
             };
+            
+            // Include estimatedAge if provided (can be null to explicitly clear it)
+            if (req.body.estimatedAge !== undefined) {
+                newItem.estimatedAge = req.body.estimatedAge;
+            }
+            
             const data = inventoryData.addItem(newItem);
             res.status(201).json({ success: true, data });
         } catch (error) {

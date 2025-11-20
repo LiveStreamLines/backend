@@ -85,6 +85,19 @@ function addUser(req, res) {
             newUser[field] = false;
         }
     });
+    
+    // Validate country field - only accept 'UAE' or 'Saudi Arabia'
+    if (newUser.country !== undefined && newUser.country !== null && newUser.country !== '') {
+        const validCountries = ['UAE', 'Saudi Arabia'];
+        if (!validCountries.includes(newUser.country)) {
+            // If invalid country value, set to undefined (will not be stored)
+            delete newUser.country;
+        }
+    } else {
+        // If empty or undefined, remove the field
+        delete newUser.country;
+    }
+    
     //check if email is new
     const usercheck = userData.getUserByEmail(req.body.email);
     logger.info(usercheck);
@@ -179,6 +192,18 @@ function updateUser(req, res) {
         }
         // Don't set to false if undefined - let it remain undefined to preserve existing values
     });
+    
+    // Validate country field - only accept 'UAE' or 'Saudi Arabia'
+    if (updatePayload.country !== undefined && updatePayload.country !== null && updatePayload.country !== '') {
+        const validCountries = ['UAE', 'Saudi Arabia'];
+        if (!validCountries.includes(updatePayload.country)) {
+            // If invalid country value, remove it from update (preserve existing value)
+            delete updatePayload.country;
+        }
+    } else if (updatePayload.country === '') {
+        // If empty string is explicitly sent, set to undefined to clear the field
+        updatePayload.country = undefined;
+    }
 
     if (req.file) {
         try {

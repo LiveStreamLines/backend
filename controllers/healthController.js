@@ -144,17 +144,24 @@ function cameraHealth(req, res) {
         count: thirdDayCount
       },
       totalImages: firstDayCount + secondDayCount + thirdDayCount,
-      hasWrongTime: hasWrongTime
+      hasWrongTime: hasWrongTime,
+      hasShutterExpiry: hasShutterExpiry
     };
 
     // Include memory information if memory is assigned
+    let shutterCount = null;
     if (memory) {
       response.hasMemoryAssigned = true;
       response.memoryAvailable = memory.memoryAvailable || null;
+      // Get shutter count from memory (check both field names)
+      shutterCount = memory.shuttercount ?? memory.shutterCount ?? null;
     } else {
       response.hasMemoryAssigned = false;
       response.memoryAvailable = null;
     }
+    
+    // Check if shutter count exceeds 10,000 (shutter expiry)
+    const hasShutterExpiry = shutterCount !== null && typeof shutterCount === 'number' && shutterCount > 10000;
 
     // Automatically update lowImages status based on yesterday's image count
     // If yesterday's count < 40, set lowImages = true, otherwise set it to false
@@ -264,6 +271,49 @@ function cameraHealth(req, res) {
           });
 
           logger.info(`Auto-updated wrongTime status for camera ${camera.camera}: ${hasWrongTime ? 'ON' : 'OFF'}`);
+        }
+
+        // Automatically update shutterExpiry status based on shutter count > 10000
+        const currentlyShutterExpiry = !!currentStatus.shutterExpiry;
+        if (hasShutterExpiry !== currentlyShutterExpiry) {
+          const nextStatus = { ...currentStatus };
+          const now = new Date().toISOString();
+          
+          if (hasShutterExpiry) {
+            // Marking as shutter expiry - set the marking date only if not already set
+            nextStatus.shutterExpiry = true;
+            if (!nextStatus.shutterExpiryMarkedAt) {
+              nextStatus.shutterExpiryMarkedBy = 'System';
+              nextStatus.shutterExpiryMarkedAt = now;
+            }
+            // Clear removal tracking when marking
+            nextStatus.shutterExpiryRemovedBy = undefined;
+            nextStatus.shutterExpiryRemovedAt = undefined;
+          } else {
+            // Clearing shutter expiry - track who cleared and when
+            nextStatus.shutterExpiry = false;
+            nextStatus.shutterExpiryRemovedBy = 'System';
+            nextStatus.shutterExpiryRemovedAt = now;
+            // Keep the original marking info for history
+          }
+
+          // Update the camera
+          cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
+
+          // Log the status change in history
+          cameraStatusHistoryController.recordStatusChange({
+            cameraId: camera._id,
+            cameraName: camera.camera,
+            developerId: camera.developer,
+            projectId: camera.project,
+            statusType: 'shutterExpiry',
+            action: hasShutterExpiry ? 'on' : 'off',
+            performedBy: 'System',
+            performedByEmail: 'system@auto',
+            performedAt: now,
+          });
+
+          logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: ${hasShutterExpiry ? 'ON' : 'OFF'} (shutter count: ${shutterCount})`);
         }
       }
     } catch (updateError) {

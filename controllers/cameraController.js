@@ -8,6 +8,66 @@ const logger = require('../logger');
 const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
+const MEDIA_ROOT = process.env.MEDIA_PATH || path.join(__dirname, '../media');
+const CAMERA_ATTACHMENTS_DIR = path.join(MEDIA_ROOT, 'attachments/cameras');
+const TEMP_ATTACHMENT_DIR = path.join(CAMERA_ATTACHMENTS_DIR, 'temp');
+
+const ensureDirectory = (dirPath) => {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+};
+
+ensureDirectory(CAMERA_ATTACHMENTS_DIR);
+ensureDirectory(TEMP_ATTACHMENT_DIR);
+
+const generateAttachmentId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
+const getUploadedBy = (user) => {
+    if (!user) {
+        return 'system';
+    }
+    return user._id || user.id || user.userId || user.email || user.name || 'system';
+};
+
+const moveInternalAttachments = (cameraId, files = [], user) => {
+    if (!files || files.length === 0) {
+        return [];
+    }
+
+    const attachmentsDir = path.join(CAMERA_ATTACHMENTS_DIR, cameraId);
+    ensureDirectory(attachmentsDir);
+
+    const uploadedBy = getUploadedBy(user);
+    const attachments = [];
+
+    files.forEach((file) => {
+        const newFileName = `${cameraId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+        const targetPath = path.join(attachmentsDir, newFileName);
+        try {
+            fs.renameSync(file.path, targetPath);
+            attachments.push({
+                _id: generateAttachmentId(),
+                name: newFileName,
+                originalName: file.originalname,
+                size: file.size,
+                type: file.mimetype,
+                url: `/media/attachments/cameras/${cameraId}/${newFileName}`,
+                uploadedAt: new Date().toISOString(),
+                uploadedBy,
+            });
+        } catch (error) {
+            logger.error('Failed to move internal attachment', error);
+            try {
+                fs.unlinkSync(file.path);
+            } catch (unlinkError) {
+                logger.warn('Failed to clean up temp attachment', unlinkError);
+            }
+        }
+    });
+
+    return attachments;
+};
 
 function resolveUserIdentity(req) {
     let resolvedName = 'Unknown';
@@ -186,18 +246,66 @@ function getLastPicturesFromAllCameras(req, res) {
 
 // Controller for adding a new Camera
 function addCamera(req, res) {
-    const newCamera = req.body;
-    const addedCamera = cameraData.addItem(newCamera);
-    res.status(201).json(addedCamera);
+    try {
+        const newCamera = { ...req.body };
+        
+        // Initialize internal attachments array
+        newCamera.internalAttachments = [];
+
+        // Handle internal attachments if provided
+        const attachmentFiles = req.files?.internalAttachments || [];
+        if (attachmentFiles.length > 0) {
+            const addedCamera = cameraData.addItem(newCamera);
+            const attachments = moveInternalAttachments(addedCamera._id, attachmentFiles, req.user);
+            if (attachments.length > 0) {
+                const response = cameraData.updateItem(addedCamera._id, { internalAttachments: attachments }) || addedCamera;
+                return res.status(201).json(response);
+            }
+            return res.status(201).json(addedCamera);
+        }
+
+        const addedCamera = cameraData.addItem(newCamera);
+        res.status(201).json(addedCamera);
+    } catch (error) {
+        logger.error('Error adding camera', error);
+        res.status(500).json({ message: 'Failed to add camera', error: error.message });
+    }
 }
 
 // Controller for updating a Camera
 function updateCamera(req, res) {
-    const updatedCamera = cameraData.updateItem(req.params.id, req.body);
-    if (updatedCamera) {
-        res.json(updatedCamera);
-    } else {
-        res.status(404).json({ message: 'Camera not found' });
+    try {
+        const cameraId = req.params.id;
+        const camera = cameraData.getItemById(cameraId);
+        
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        const updatedData = { ...req.body };
+        
+        // Don't update internalAttachments from body - handle files separately
+        delete updatedData.internalAttachments;
+
+        // Handle internal attachments if provided
+        const attachmentFiles = req.files?.internalAttachments || [];
+        if (attachmentFiles.length > 0) {
+            const attachments = moveInternalAttachments(cameraId, attachmentFiles, req.user);
+            if (attachments.length > 0) {
+                const merged = [...(camera.internalAttachments || []), ...attachments];
+                updatedData.internalAttachments = merged;
+            }
+        }
+
+        const updatedCamera = cameraData.updateItem(cameraId, updatedData);
+        if (updatedCamera) {
+            res.json(updatedCamera);
+        } else {
+            res.status(404).json({ message: 'Camera not found' });
+        }
+    } catch (error) {
+        logger.error('Error updating camera', error);
+        res.status(500).json({ message: 'Failed to update camera', error: error.message });
     }
 }
 
@@ -525,6 +633,52 @@ function deleteCamera(req, res) {
     }
 }
 
+function deleteInternalAttachment(req, res) {
+    try {
+        const cameraId = req.params.id;
+        const attachmentId = req.params.attachmentId;
+
+        const camera = cameraData.getItemById(cameraId);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        const attachments = camera.internalAttachments || [];
+        const attachmentIndex = attachments.findIndex(a => a._id === attachmentId);
+
+        if (attachmentIndex === -1) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = attachments[attachmentIndex];
+        const attachmentPath = path.join(MEDIA_ROOT, attachment.url.replace('/media/', ''));
+
+        // Delete file from filesystem
+        try {
+            if (fs.existsSync(attachmentPath)) {
+                fs.unlinkSync(attachmentPath);
+            }
+        } catch (fileError) {
+            logger.warn('Failed to delete attachment file', fileError);
+        }
+
+        // Remove attachment from array
+        const updatedAttachments = attachments.filter(a => a._id !== attachmentId);
+        const updatedCamera = cameraData.updateItem(cameraId, {
+            internalAttachments: updatedAttachments
+        });
+
+        if (updatedCamera) {
+            res.json(updatedCamera);
+        } else {
+            res.status(404).json({ message: 'Camera not found' });
+        }
+    } catch (error) {
+        logger.error('Error deleting internal attachment', error);
+        res.status(500).json({ message: 'Failed to delete attachment', error: error.message });
+    }
+}
+
 module.exports = {
     getAllCameras,
     getLastPicturesFromAllCameras,
@@ -540,4 +694,5 @@ module.exports = {
     updateCameraInvoicedDuration,
     deleteCamera,
     getMaintenanceCycleStartDate,
+    deleteInternalAttachment
 };

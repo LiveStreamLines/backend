@@ -177,7 +177,25 @@ function cameraHealth(req, res) {
         // Only update if the status needs to change
         if (shouldBeLowImages !== currentlyLowImages) {
           const nextStatus = { ...currentStatus };
-          nextStatus.lowImages = shouldBeLowImages;
+          const now = new Date().toISOString();
+          
+          if (shouldBeLowImages) {
+            // Marking as low images - set the marking date only if not already set
+            nextStatus.lowImages = true;
+            if (!nextStatus.lowImagesMarkedAt) {
+              nextStatus.lowImagesMarkedBy = 'System';
+              nextStatus.lowImagesMarkedAt = now;
+            }
+            // Clear removal tracking when marking
+            nextStatus.lowImagesRemovedBy = undefined;
+            nextStatus.lowImagesRemovedAt = undefined;
+          } else {
+            // Clearing low images - track who cleared and when
+            nextStatus.lowImages = false;
+            nextStatus.lowImagesRemovedBy = 'System';
+            nextStatus.lowImagesRemovedAt = now;
+            // Keep the original marking info for history
+          }
 
           // Update the camera
           cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
@@ -192,7 +210,7 @@ function cameraHealth(req, res) {
             action: shouldBeLowImages ? 'on' : 'off',
             performedBy: 'System',
             performedByEmail: 'system@auto',
-            performedAt: new Date().toISOString(),
+            performedAt: now,
           });
 
           logger.info(`Auto-updated lowImages status for camera ${camera.camera}: ${shouldBeLowImages ? 'ON' : 'OFF'} (yesterday's count: ${firstDayCount})`);

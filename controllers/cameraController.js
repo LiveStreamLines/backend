@@ -268,6 +268,49 @@ function updateCameraMaintenanceStatus(req, res) {
         }
         if (typeof lowImages === 'boolean') {
             nextStatus.lowImages = lowImages;
+            // Track who clicked and when
+            if (lowImages) {
+                const markedBy = userIdentity.name;
+                const markedAt = new Date().toISOString();
+                // Only set marking date if not already set (preserve original marking date)
+                if (!nextStatus.lowImagesMarkedAt) {
+                    nextStatus.lowImagesMarkedBy = markedBy;
+                    nextStatus.lowImagesMarkedAt = markedAt;
+                }
+                // Clear removal tracking when marking
+                nextStatus.lowImagesRemovedBy = undefined;
+                nextStatus.lowImagesRemovedAt = undefined;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'lowImages',
+                    action: 'on',
+                    performedBy: markedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: markedAt,
+                });
+            } else {
+                // Track who removed and when
+                const removedBy = userIdentity.name;
+                const removedAt = new Date().toISOString();
+                nextStatus.lowImagesRemovedBy = removedBy;
+                nextStatus.lowImagesRemovedAt = removedAt;
+                cameraStatusHistoryController.recordStatusChange({
+                    cameraId: camera._id,
+                    cameraName: camera.camera,
+                    developerId: camera.developer,
+                    projectId: camera.project,
+                    statusType: 'lowImages',
+                    action: 'off',
+                    performedBy: removedBy,
+                    performedByEmail: userIdentity.email,
+                    performedAt: removedAt,
+                });
+                // Keep the original marking info for history
+                // Don't clear lowImagesMarkedBy and lowImagesMarkedAt
+            }
         }
         if (typeof betterView === 'boolean') {
             nextStatus.betterView = betterView;

@@ -6,10 +6,107 @@ const MemoryData = require('../models/memoryData');
 const cameraData = require('../models/cameraData');
 const developerData = require('../models/developerData');
 const projectData = require('../models/projectData');
+const inventoryData = require('../models/inventoryData');
+const deviceTypeData = require('../models/deviceTypeData');
 const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 
 // Define the root directory for camera pictures
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
+
+// Helper function to calculate validity left for an inventory item
+function calculateValidityLeft(inventoryItem, deviceTypes) {
+  // Get total validity days from device type or item
+  let totalValidity = null;
+  
+  const deviceTypeName = inventoryItem.device?.type?.trim().toLowerCase();
+  if (deviceTypeName) {
+    const deviceType = deviceTypes.find(dt => {
+      const dtName = (dt.name || '').trim().toLowerCase();
+      return dtName === deviceTypeName;
+    });
+    if (deviceType && deviceType.validityDays) {
+      totalValidity = parseInt(deviceType.validityDays, 10);
+    }
+  }
+  
+  // Fallback to item's validityDays
+  if (totalValidity === null && inventoryItem.validityDays) {
+    totalValidity = parseInt(inventoryItem.validityDays, 10);
+  }
+  
+  if (totalValidity === null || totalValidity <= 0 || isNaN(totalValidity)) {
+    return null; // Cannot calculate
+  }
+  
+  // Calculate age in days
+  let ageInDays = 0;
+  
+  // Add estimated age if present
+  if (inventoryItem.estimatedAge) {
+    const estimatedAge = parseInt(inventoryItem.estimatedAge, 10);
+    if (!isNaN(estimatedAge) && estimatedAge > 0) {
+      ageInDays += estimatedAge;
+    }
+  }
+  
+  // Calculate from assignment date
+  if (inventoryItem.currentAssignment?.assignedDate) {
+    const assignedDate = new Date(inventoryItem.currentAssignment.assignedDate);
+    const now = new Date();
+    if (!isNaN(assignedDate.getTime())) {
+      const daysSinceAssignment = Math.floor((now - assignedDate) / (1000 * 60 * 60 * 24));
+      ageInDays += daysSinceAssignment;
+    }
+  }
+  
+  // Calculate from created date if no assignment
+  if (!inventoryItem.currentAssignment && inventoryItem.createdDate) {
+    const createdDate = new Date(inventoryItem.createdDate);
+    const now = new Date();
+    if (!isNaN(createdDate.getTime())) {
+      const daysSinceCreation = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+      ageInDays += daysSinceCreation;
+    }
+  }
+  
+  return totalValidity - ageInDays;
+}
+
+// Helper function to get inventory items assigned to a camera
+function getInventoryItemsByCamera(cameraId, cameraName, developerId, projectId) {
+  const allItems = inventoryData.getAllItems();
+  
+  return allItems.filter(item => {
+    // Check assignedCameraId
+    if (item.assignedCameraId === cameraId) {
+      return true;
+    }
+    
+    // Check currentAssignment.camera (could be ID or name)
+    if (item.currentAssignment?.camera) {
+      const assignmentCamera = item.currentAssignment.camera;
+      // If it's a string and matches camera name (not an ObjectId)
+      if (typeof assignmentCamera === 'string') {
+        // Check if it's an ObjectId (24 hex characters)
+        const isObjectId = /^[a-f0-9]{24}$/i.test(assignmentCamera);
+        if (isObjectId && assignmentCamera === cameraId) {
+          return true;
+        }
+        if (!isObjectId && assignmentCamera.toLowerCase() === cameraName.toLowerCase()) {
+          return true;
+        }
+      }
+    }
+    
+    // Check assignedCameraName
+    if (item.assignedCameraName && 
+        item.assignedCameraName.toLowerCase() === cameraName.toLowerCase()) {
+      return true;
+    }
+    
+    return false;
+  });
+}
 
 function healthCheck(req, res) {
   try {
@@ -176,7 +273,8 @@ function cameraHealth(req, res) {
       hasShutterExpiry: hasShutterExpiry,
       hasMemoryAssigned: hasMemoryAssigned,
       memoryAvailable: memoryAvailable,
-      shutterCount: shutterCount
+      shutterCount: shutterCount,
+      hasDeviceExpired: false // Will be calculated below
     };
 
     // Automatically update lowImages status based on yesterday's image count
@@ -343,6 +441,73 @@ function cameraHealth(req, res) {
 
           logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: ${hasShutterExpiry ? 'ON' : 'OFF'} (shutter count: ${shutterCount}, memory: ${memory ? 'found' : 'not found'})`);
         }
+
+        // Automatically update deviceExpiry status based on assigned inventory items
+        const inventoryItems = getInventoryItemsByCamera(
+          camera._id, 
+          camera.camera, 
+          developerId, 
+          projectId
+        );
+        const deviceTypes = deviceTypeData.getAllItems();
+
+        let hasDeviceExpired = false;
+        if (inventoryItems.length > 0) {
+          // Check if any assigned device has validityLeft <= 0
+          for (const item of inventoryItems) {
+            const validityLeft = calculateValidityLeft(item, deviceTypes);
+            if (validityLeft !== null && validityLeft <= 0) {
+              hasDeviceExpired = true;
+              logger.info(`Device expiry detected for camera ${camera.camera}: item ${item._id} has validityLeft=${validityLeft}`);
+              break;
+            }
+          }
+        }
+
+        const currentlyDeviceExpiry = !!currentStatus.deviceExpiry;
+
+        if (hasDeviceExpired !== currentlyDeviceExpiry) {
+          const nextStatus = { ...currentStatus };
+          const now = new Date().toISOString();
+          
+          if (hasDeviceExpired) {
+            // Marking as device expiry - set the marking date only if not already set
+            nextStatus.deviceExpiry = true;
+            if (!nextStatus.deviceExpiryMarkedAt) {
+              nextStatus.deviceExpiryMarkedBy = 'System';
+              nextStatus.deviceExpiryMarkedAt = now;
+            }
+            // Clear removal tracking when marking
+            nextStatus.deviceExpiryRemovedBy = undefined;
+            nextStatus.deviceExpiryRemovedAt = undefined;
+          } else {
+            // Clearing device expiry - track who cleared and when
+            nextStatus.deviceExpiry = false;
+            nextStatus.deviceExpiryRemovedBy = 'System';
+            nextStatus.deviceExpiryRemovedAt = now;
+          }
+
+          // Update the camera
+          cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
+
+          // Log the status change in history
+          cameraStatusHistoryController.recordStatusChange({
+            cameraId: camera._id,
+            cameraName: camera.camera,
+            developerId: camera.developer,
+            projectId: camera.project,
+            statusType: 'deviceExpiry',
+            action: hasDeviceExpired ? 'on' : 'off',
+            performedBy: 'System',
+            performedByEmail: 'system@auto',
+            performedAt: now,
+          });
+
+          logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: ${hasDeviceExpired ? 'ON' : 'OFF'} (inventory items checked: ${inventoryItems.length})`);
+        }
+
+        // Update response with device expiry status
+        response.hasDeviceExpired = hasDeviceExpired;
       }
     } catch (updateError) {
       // Log error but don't fail the health check

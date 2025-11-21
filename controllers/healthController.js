@@ -124,15 +124,17 @@ function cameraHealth(req, res) {
 
     // Check if there's an assigned memory for this camera
     // The parameters are actually tags/names, not IDs
+    // Note: findMemory already filters for status === 'active'
     const memories = MemoryData.findMemory(developerId, projectId, cameraId);
     const memory = memories && memories.length > 0 ? memories[0] : null;
     
-    // Include memory information if memory is assigned
+    // Include memory information if memory is assigned and active
     let shutterCount = null;
     let hasMemoryAssigned = false;
     let memoryAvailable = null;
     
-    if (memory) {
+    // Only process if memory exists and is active (findMemory already filters for active, but double-check for safety)
+    if (memory && memory.status === 'active') {
       hasMemoryAssigned = true;
       memoryAvailable = memory.memoryAvailable || null;
       // Get shutter count from memory (check both field names)
@@ -148,8 +150,8 @@ function cameraHealth(req, res) {
       }
     }
     
-    // Check if shutter count exceeds 10,000 (shutter expiry)
-    const hasShutterExpiry = shutterCount !== null && shutterCount > 10000;
+    // Check if shutter count exceeds 10,000 (shutter expiry) - only for active memories
+    const hasShutterExpiry = memory && memory.status === 'active' && shutterCount !== null && shutterCount > 10000;
     
     const response = {
       developerId,

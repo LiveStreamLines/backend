@@ -171,7 +171,8 @@ function cameraHealth(req, res) {
       hasWrongTime: hasWrongTime,
       hasShutterExpiry: hasShutterExpiry,
       hasMemoryAssigned: hasMemoryAssigned,
-      memoryAvailable: memoryAvailable
+      memoryAvailable: memoryAvailable,
+      shutterCount: shutterCount
     };
 
     // Automatically update lowImages status based on yesterday's image count

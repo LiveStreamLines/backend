@@ -77,28 +77,60 @@ function getInventoryItemsByCamera(cameraId, cameraName, developerId, projectId)
   const allItems = inventoryData.getAllItems();
   
   return allItems.filter(item => {
-    // Check assignedCameraId
-    if (item.assignedCameraId === cameraId) {
-      return true;
+    // Only check items that are assigned (status === 'assigned')
+    // Items with status 'available' or 'user_assigned' are not assigned to cameras
+    if (item.status !== 'assigned') {
+      return false;
     }
     
-    // Check currentAssignment.camera (could be ID or name)
-    if (item.currentAssignment?.camera) {
-      const assignmentCamera = item.currentAssignment.camera;
-      // If it's a string and matches camera name (not an ObjectId)
-      if (typeof assignmentCamera === 'string') {
-        // Check if it's an ObjectId (24 hex characters)
-        const isObjectId = /^[a-f0-9]{24}$/i.test(assignmentCamera);
-        if (isObjectId && assignmentCamera === cameraId) {
-          return true;
+    // Check if item has currentAssignment (modern assignment structure)
+    if (item.currentAssignment) {
+      const assignment = item.currentAssignment;
+      
+      // Check if assignment matches the camera's developer and project
+      const assignmentDeveloperId = typeof assignment.developer === 'object' 
+        ? assignment.developer._id 
+        : assignment.developer;
+      const assignmentProjectId = typeof assignment.project === 'object' 
+        ? assignment.project._id 
+        : assignment.project;
+      
+      // Developer and project must match
+      if (assignmentDeveloperId !== developerId || assignmentProjectId !== projectId) {
+        return false;
+      }
+      
+      // Check if camera matches
+      if (assignment.camera) {
+        const assignmentCamera = assignment.camera;
+        
+        // If camera is an object with _id
+        if (typeof assignmentCamera === 'object' && assignmentCamera._id) {
+          if (assignmentCamera._id === cameraId) {
+            return true;
+          }
         }
-        if (!isObjectId && assignmentCamera.toLowerCase() === cameraName.toLowerCase()) {
-          return true;
+        
+        // If camera is a string
+        if (typeof assignmentCamera === 'string') {
+          // Check if it's an ObjectId (24 hex characters)
+          const isObjectId = /^[a-f0-9]{24}$/i.test(assignmentCamera);
+          if (isObjectId && assignmentCamera === cameraId) {
+            return true;
+          }
+          if (!isObjectId && assignmentCamera.toLowerCase() === cameraName.toLowerCase()) {
+            return true;
+          }
         }
       }
     }
     
-    // Check assignedCameraName
+    // Legacy support: Check assignedCameraId (for items without currentAssignment)
+    if (item.assignedCameraId === cameraId) {
+      return true;
+    }
+    
+    // Legacy support: Check assignedCameraName (for items without currentAssignment)
     if (item.assignedCameraName && 
         item.assignedCameraName.toLowerCase() === cameraName.toLowerCase()) {
       return true;
@@ -456,16 +488,40 @@ function cameraHealth(req, res) {
         const deviceTypes = deviceTypeData.getAllItems();
 
         let hasDeviceExpired = false;
+        let expiredItemDetails = null;
+        
         if (inventoryItems.length > 0) {
+          logger.info(`Checking device expiry for camera ${camera.camera}: ${inventoryItems.length} assigned inventory items`);
+          
           // Check if any assigned device has validityLeft <= 0
           for (const item of inventoryItems) {
             const validityLeft = calculateValidityLeft(item, deviceTypes);
-            if (validityLeft !== null && validityLeft <= 0) {
+            
+            // Log details for debugging
+            const deviceName = item.device?.deviceName || item.device?.model || 'Unknown device';
+            const serialNumber = item.device?.serialNumber || item._id;
+            
+            if (validityLeft === null) {
+              logger.debug(`Cannot calculate validity for camera ${camera.camera}, item ${serialNumber} (${deviceName}): missing validity data`);
+              continue;
+            }
+            
+            logger.debug(`Camera ${camera.camera}, item ${serialNumber} (${deviceName}): validityLeft=${validityLeft}`);
+            
+            if (validityLeft <= 0) {
               hasDeviceExpired = true;
-              logger.info(`Device expiry detected for camera ${camera.camera}: item ${item._id} has validityLeft=${validityLeft}`);
+              expiredItemDetails = {
+                itemId: item._id,
+                deviceName,
+                serialNumber,
+                validityLeft,
+              };
+              logger.info(`Device expiry detected for camera ${camera.camera}: item ${serialNumber} (${deviceName}) has validityLeft=${validityLeft}`);
               break;
             }
           }
+        } else {
+          logger.debug(`No assigned inventory items found for camera ${camera.camera} (ID: ${camera._id}, Developer: ${developerId}, Project: ${projectId})`);
         }
 
         const currentlyDeviceExpiry = currentStatusFromHistory.deviceExpiry;
@@ -489,7 +545,7 @@ function cameraHealth(req, res) {
                 performedAt: now,
               });
 
-              logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: ON (inventory items checked: ${inventoryItems.length})`);
+              logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: ON (inventory items checked: ${inventoryItems.length}${expiredItemDetails ? `, expired item: ${expiredItemDetails.serialNumber} (${expiredItemDetails.deviceName}), validityLeft=${expiredItemDetails.validityLeft}` : ''})`);
             }
           } else {
             // Clearing device expiry - only log removal if it was previously marked
@@ -507,7 +563,7 @@ function cameraHealth(req, res) {
                 performedAt: now,
               });
 
-              logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: OFF (inventory items checked: ${inventoryItems.length})`);
+              logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: OFF (inventory items checked: ${inventoryItems.length}, all items have validityLeft > 0)`);
             }
           }
         }

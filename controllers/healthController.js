@@ -322,10 +322,12 @@ function cameraHealth(req, res) {
             nextStatus.lowImagesRemovedBy = undefined;
             nextStatus.lowImagesRemovedAt = undefined;
           } else {
-            // Clearing low images - track who cleared and when
+            // Clearing low images - track who cleared and when (only if not already set)
             nextStatus.lowImages = false;
-            nextStatus.lowImagesRemovedBy = 'System';
-            nextStatus.lowImagesRemovedAt = now;
+            if (!nextStatus.lowImagesRemovedAt) {
+              nextStatus.lowImagesRemovedBy = 'System';
+              nextStatus.lowImagesRemovedAt = now;
+            }
             // Keep the original marking info for history
           }
 
@@ -365,10 +367,12 @@ function cameraHealth(req, res) {
             nextStatus.wrongTimeRemovedBy = undefined;
             nextStatus.wrongTimeRemovedAt = undefined;
           } else {
-            // Clearing wrong time - track who cleared and when
+            // Clearing wrong time - track who cleared and when (only if not already set)
             nextStatus.wrongTime = false;
-            nextStatus.wrongTimeRemovedBy = 'System';
-            nextStatus.wrongTimeRemovedAt = now;
+            if (!nextStatus.wrongTimeRemovedAt) {
+              nextStatus.wrongTimeRemovedBy = 'System';
+              nextStatus.wrongTimeRemovedAt = now;
+            }
             // Keep the original marking info for history
           }
 
@@ -416,10 +420,12 @@ function cameraHealth(req, res) {
             nextStatus.shutterExpiryRemovedBy = undefined;
             nextStatus.shutterExpiryRemovedAt = undefined;
           } else {
-            // Clearing shutter expiry - track who cleared and when
+            // Clearing shutter expiry - track who cleared and when (only if not already set)
             nextStatus.shutterExpiry = false;
-            nextStatus.shutterExpiryRemovedBy = 'System';
-            nextStatus.shutterExpiryRemovedAt = now;
+            if (!nextStatus.shutterExpiryRemovedAt) {
+              nextStatus.shutterExpiryRemovedBy = 'System';
+              nextStatus.shutterExpiryRemovedAt = now;
+            }
             // Keep the original marking info for history
           }
 
@@ -481,10 +487,12 @@ function cameraHealth(req, res) {
             nextStatus.deviceExpiryRemovedBy = undefined;
             nextStatus.deviceExpiryRemovedAt = undefined;
           } else {
-            // Clearing device expiry - track who cleared and when
+            // Clearing device expiry - track who cleared and when (only if not already set)
             nextStatus.deviceExpiry = false;
-            nextStatus.deviceExpiryRemovedBy = 'System';
-            nextStatus.deviceExpiryRemovedAt = now;
+            if (!nextStatus.deviceExpiryRemovedAt) {
+              nextStatus.deviceExpiryRemovedBy = 'System';
+              nextStatus.deviceExpiryRemovedAt = now;
+            }
           }
 
           // Update the camera

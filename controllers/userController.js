@@ -71,8 +71,8 @@ function addUser(req, res) {
         'hasUaeAccess', 'hasSaudiAccess', 'hasCameraMonitorAccess',
         'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
         'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
-        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canAssignUnassignUser',
-        'canAssignUnassignProject', 'canArchiveMemory', 'isActive'
+        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canSeeAllInventory',
+        'canAssignToUser', 'canArchiveMemory', 'isActive'
     ];
     booleanFields.forEach(field => {
         if (newUser[field] !== undefined && newUser[field] !== null) {
@@ -179,8 +179,8 @@ function updateUser(req, res) {
         'hasUaeAccess', 'hasSaudiAccess', 'hasCameraMonitorAccess',
         'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
         'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
-        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canAssignUnassignUser',
-        'canAssignUnassignProject', 'canArchiveMemory', 'isActive'
+        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canSeeAllInventory',
+        'canAssignToUser', 'canArchiveMemory', 'isActive'
     ];
     booleanFields.forEach(field => {
         if (updatePayload[field] !== undefined && updatePayload[field] !== null) {

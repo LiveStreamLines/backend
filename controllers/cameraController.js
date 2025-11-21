@@ -328,198 +328,115 @@ function updateCameraMaintenanceStatus(req, res) {
             return res.status(404).json({ message: 'Camera not found' });
         }
 
-        const currentStatus = camera.maintenanceStatus || {};
-        const nextStatus = { ...currentStatus };
+        // Get current status from history instead of camera.maintenanceStatus
+        const currentStatusFromHistory = cameraStatusHistoryController.getCurrentStatusFromHistory(camera._id);
         const userIdentity = resolveUserIdentity(req);
 
         if (typeof photoDirty === 'boolean') {
-            nextStatus.photoDirty = photoDirty;
-            // Track who clicked and when
-            if (photoDirty) {
-                const markedBy = userIdentity.name;
-                const markedAt = new Date().toISOString();
-                nextStatus.photoDirtyMarkedBy = markedBy;
-                nextStatus.photoDirtyMarkedAt = markedAt;
-                // Clear removal tracking when marking as dirty
-                nextStatus.photoDirtyRemovedBy = undefined;
-                nextStatus.photoDirtyRemovedAt = undefined;
-                cameraStatusHistoryController.recordStatusChange({
-                    cameraId: camera._id,
-                    cameraName: camera.camera,
-                    developerId: camera.developer,
-                    projectId: camera.project,
-                    statusType: 'photoDirty',
-                    action: 'on',
-                    performedBy: markedBy,
-                    performedByEmail: userIdentity.email,
-                    performedAt: markedAt,
-                });
-            } else {
-                // Track who removed and when
-                const removedBy = userIdentity.name;
-                const removedAt = new Date().toISOString();
-                nextStatus.photoDirtyRemovedBy = removedBy;
-                nextStatus.photoDirtyRemovedAt = removedAt;
-                cameraStatusHistoryController.recordStatusChange({
-                    cameraId: camera._id,
-                    cameraName: camera.camera,
-                    developerId: camera.developer,
-                    projectId: camera.project,
-                    statusType: 'photoDirty',
-                    action: 'off',
-                    performedBy: removedBy,
-                    performedByEmail: userIdentity.email,
-                    performedAt: removedAt,
-                });
-                // Keep the original marking info for history
-                // Don't clear photoDirtyMarkedBy and photoDirtyMarkedAt
+            const currentlyPhotoDirty = currentStatusFromHistory.photoDirty;
+            // Only log if status is actually changing
+            if (photoDirty !== currentlyPhotoDirty) {
+                const now = new Date().toISOString();
+                if (photoDirty) {
+                    cameraStatusHistoryController.recordStatusChange({
+                        cameraId: camera._id,
+                        cameraName: camera.camera,
+                        developerId: camera.developer,
+                        projectId: camera.project,
+                        statusType: 'photoDirty',
+                        action: 'on',
+                        performedBy: userIdentity.name,
+                        performedByEmail: userIdentity.email,
+                        performedAt: now,
+                    });
+                } else {
+                    cameraStatusHistoryController.recordStatusChange({
+                        cameraId: camera._id,
+                        cameraName: camera.camera,
+                        developerId: camera.developer,
+                        projectId: camera.project,
+                        statusType: 'photoDirty',
+                        action: 'off',
+                        performedBy: userIdentity.name,
+                        performedByEmail: userIdentity.email,
+                        performedAt: now,
+                    });
+                }
             }
         }
         if (typeof lowImages === 'boolean') {
-            nextStatus.lowImages = lowImages;
-            // Track who clicked and when
-            if (lowImages) {
-                const markedBy = userIdentity.name;
-                const markedAt = new Date().toISOString();
-                // Only set marking date if not already set (preserve original marking date)
-                if (!nextStatus.lowImagesMarkedAt) {
-                    nextStatus.lowImagesMarkedBy = markedBy;
-                    nextStatus.lowImagesMarkedAt = markedAt;
-                }
-                // Clear removal tracking when marking
-                nextStatus.lowImagesRemovedBy = undefined;
-                nextStatus.lowImagesRemovedAt = undefined;
+            const currentlyLowImages = currentStatusFromHistory.lowImages;
+            if (lowImages !== currentlyLowImages) {
+                const now = new Date().toISOString();
                 cameraStatusHistoryController.recordStatusChange({
                     cameraId: camera._id,
                     cameraName: camera.camera,
                     developerId: camera.developer,
                     projectId: camera.project,
                     statusType: 'lowImages',
-                    action: 'on',
-                    performedBy: markedBy,
+                    action: lowImages ? 'on' : 'off',
+                    performedBy: userIdentity.name,
                     performedByEmail: userIdentity.email,
-                    performedAt: markedAt,
+                    performedAt: now,
                 });
-            } else {
-                // Track who removed and when
-                const removedBy = userIdentity.name;
-                const removedAt = new Date().toISOString();
-                nextStatus.lowImagesRemovedBy = removedBy;
-                nextStatus.lowImagesRemovedAt = removedAt;
-                cameraStatusHistoryController.recordStatusChange({
-                    cameraId: camera._id,
-                    cameraName: camera.camera,
-                    developerId: camera.developer,
-                    projectId: camera.project,
-                    statusType: 'lowImages',
-                    action: 'off',
-                    performedBy: removedBy,
-                    performedByEmail: userIdentity.email,
-                    performedAt: removedAt,
-                });
-                // Keep the original marking info for history
-                // Don't clear lowImagesMarkedBy and lowImagesMarkedAt
             }
         }
         if (typeof betterView === 'boolean') {
-            nextStatus.betterView = betterView;
-            // Track who clicked and when
-            if (betterView) {
-                const markedBy = userIdentity.name;
-                const markedAt = new Date().toISOString();
-                nextStatus.betterViewMarkedBy = markedBy;
-                nextStatus.betterViewMarkedAt = markedAt;
-                // Clear removal tracking when marking as better view
-                nextStatus.betterViewRemovedBy = undefined;
-                nextStatus.betterViewRemovedAt = undefined;
+            const currentlyBetterView = currentStatusFromHistory.betterView;
+            if (betterView !== currentlyBetterView) {
+                const now = new Date().toISOString();
                 cameraStatusHistoryController.recordStatusChange({
                     cameraId: camera._id,
                     cameraName: camera.camera,
                     developerId: camera.developer,
                     projectId: camera.project,
                     statusType: 'betterView',
-                    action: 'on',
-                    performedBy: markedBy,
+                    action: betterView ? 'on' : 'off',
+                    performedBy: userIdentity.name,
                     performedByEmail: userIdentity.email,
-                    performedAt: markedAt,
+                    performedAt: now,
                 });
-            } else {
-                // Track who removed and when
-                const removedBy = userIdentity.name;
-                const removedAt = new Date().toISOString();
-                nextStatus.betterViewRemovedBy = removedBy;
-                nextStatus.betterViewRemovedAt = removedAt;
-                cameraStatusHistoryController.recordStatusChange({
-                    cameraId: camera._id,
-                    cameraName: camera.camera,
-                    developerId: camera.developer,
-                    projectId: camera.project,
-                    statusType: 'betterView',
-                    action: 'off',
-                    performedBy: removedBy,
-                    performedByEmail: userIdentity.email,
-                    performedAt: removedAt,
-                });
-                // Keep the original marking info for history
-                // Don't clear betterViewMarkedBy and betterViewMarkedAt
             }
         }
         if (typeof wrongTime === 'boolean') {
-            nextStatus.wrongTime = wrongTime;
-            // Track who clicked and when
-            if (wrongTime) {
-                const markedBy = userIdentity.name;
-                const markedAt = new Date().toISOString();
-                // Only set marking date if not already set (preserve original marking date)
-                if (!nextStatus.wrongTimeMarkedAt) {
-                    nextStatus.wrongTimeMarkedBy = markedBy;
-                    nextStatus.wrongTimeMarkedAt = markedAt;
-                }
-                // Clear removal tracking when marking
-                nextStatus.wrongTimeRemovedBy = undefined;
-                nextStatus.wrongTimeRemovedAt = undefined;
+            const currentlyWrongTime = currentStatusFromHistory.wrongTime;
+            if (wrongTime !== currentlyWrongTime) {
+                const now = new Date().toISOString();
                 cameraStatusHistoryController.recordStatusChange({
                     cameraId: camera._id,
                     cameraName: camera.camera,
                     developerId: camera.developer,
                     projectId: camera.project,
                     statusType: 'wrongTime',
-                    action: 'on',
-                    performedBy: markedBy,
+                    action: wrongTime ? 'on' : 'off',
+                    performedBy: userIdentity.name,
                     performedByEmail: userIdentity.email,
-                    performedAt: markedAt,
+                    performedAt: now,
                 });
-            } else {
-                // Track who removed and when
-                const removedBy = userIdentity.name;
-                const removedAt = new Date().toISOString();
-                nextStatus.wrongTimeRemovedBy = removedBy;
-                nextStatus.wrongTimeRemovedAt = removedAt;
-                cameraStatusHistoryController.recordStatusChange({
-                    cameraId: camera._id,
-                    cameraName: camera.camera,
-                    developerId: camera.developer,
-                    projectId: camera.project,
-                    statusType: 'wrongTime',
-                    action: 'off',
-                    performedBy: removedBy,
-                    performedByEmail: userIdentity.email,
-                    performedAt: removedAt,
-                });
-                // Keep the original marking info for history
-                // Don't clear wrongTimeMarkedBy and wrongTimeMarkedAt
             }
         }
 
-        const updatedCamera = cameraData.updateItem(req.params.id, {
-            maintenanceStatus: nextStatus,
-        });
+        // Get updated status from history and return it with camera info
+        const updatedStatusFromHistory = cameraStatusHistoryController.getCurrentStatusFromHistory(camera._id);
+        const statusMetadata = {
+            photoDirty: cameraStatusHistoryController.getStatusMetadataFromHistory(camera._id, 'photoDirty'),
+            betterView: cameraStatusHistoryController.getStatusMetadataFromHistory(camera._id, 'betterView'),
+            lowImages: cameraStatusHistoryController.getStatusMetadataFromHistory(camera._id, 'lowImages'),
+            wrongTime: cameraStatusHistoryController.getStatusMetadataFromHistory(camera._id, 'wrongTime'),
+            shutterExpiry: cameraStatusHistoryController.getStatusMetadataFromHistory(camera._id, 'shutterExpiry'),
+            deviceExpiry: cameraStatusHistoryController.getStatusMetadataFromHistory(camera._id, 'deviceExpiry'),
+        };
 
         logger.info(
-          `Updated camera maintenance status: ${updatedCamera.camera} (ID: ${updatedCamera._id})`,
+          `Updated camera maintenance status: ${camera.camera} (ID: ${camera._id})`,
         );
 
-        res.json(updatedCamera);
+        // Return camera with status from history
+        res.json({
+            ...camera,
+            maintenanceStatusFromHistory: updatedStatusFromHistory,
+            maintenanceStatusMetadata: statusMetadata,
+        });
     } catch (error) {
         logger.error('Error updating camera maintenance status:', error);
         res.status(500).json({ message: error.message });

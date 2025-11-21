@@ -7,6 +7,7 @@ router.use(authMiddleware);
 
 router.get('/', cameraStatusHistoryController.getAllHistory);
 router.get('/:cameraId', cameraStatusHistoryController.getHistoryByCamera);
+router.get('/:cameraId/current-status', cameraStatusHistoryController.getCurrentStatus);
 
 module.exports = router;
 

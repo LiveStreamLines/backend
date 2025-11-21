@@ -302,57 +302,37 @@ function cameraHealth(req, res) {
       }
 
       if (camera) {
-        const currentStatus = camera.maintenanceStatus || {};
+        // Get current status from history instead of camera.maintenanceStatus
+        const currentStatusFromHistory = cameraStatusHistoryController.getCurrentStatusFromHistory(camera._id);
         const shouldBeLowImages = firstDayCount < 40;
-        const currentlyLowImages = !!currentStatus.lowImages;
+        const currentlyLowImages = currentStatusFromHistory.lowImages;
 
         // Only update if the status needs to change
         if (shouldBeLowImages !== currentlyLowImages) {
-          const nextStatus = { ...currentStatus };
           const now = new Date().toISOString();
           
           if (shouldBeLowImages) {
-            // Marking as low images - set the marking date only if not already set
-            nextStatus.lowImages = true;
-            if (!nextStatus.lowImagesMarkedAt) {
-              nextStatus.lowImagesMarkedBy = 'System';
-              nextStatus.lowImagesMarkedAt = now;
+            // Marking as low images - only log if not already marked
+            if (!currentlyLowImages) {
+              // Log the status change in history
+              cameraStatusHistoryController.recordStatusChange({
+                cameraId: camera._id,
+                cameraName: camera.camera,
+                developerId: camera.developer,
+                projectId: camera.project,
+                statusType: 'lowImages',
+                action: 'on',
+                performedBy: 'System',
+                performedByEmail: 'system@auto',
+                performedAt: now,
+              });
+
+              logger.info(`Auto-updated lowImages status for camera ${camera.camera}: ON (yesterday's count: ${firstDayCount})`);
             }
-            // Clear removal tracking when marking
-            nextStatus.lowImagesRemovedBy = undefined;
-            nextStatus.lowImagesRemovedAt = undefined;
-            
-            // Update the camera
-            cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-            // Log the status change in history (only when marking)
-            cameraStatusHistoryController.recordStatusChange({
-              cameraId: camera._id,
-              cameraName: camera.camera,
-              developerId: camera.developer,
-              projectId: camera.project,
-              statusType: 'lowImages',
-              action: 'on',
-              performedBy: 'System',
-              performedByEmail: 'system@auto',
-              performedAt: now,
-            });
-
-            logger.info(`Auto-updated lowImages status for camera ${camera.camera}: ON (yesterday's count: ${firstDayCount})`);
           } else {
             // Clearing low images - only log removal if it was previously marked
-            if (currentlyLowImages && currentStatus.lowImagesMarkedAt) {
-              nextStatus.lowImages = false;
-              if (!nextStatus.lowImagesRemovedAt) {
-                nextStatus.lowImagesRemovedBy = 'System';
-                nextStatus.lowImagesRemovedAt = now;
-              }
-              // Keep the original marking info for history
-
-              // Update the camera
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-              // Log the status change in history (only when actually removing a previously marked status)
+            if (currentlyLowImages) {
+              // Log the status change in history
               cameraStatusHistoryController.recordStatusChange({
                 cameraId: camera._id,
                 cameraName: camera.camera,
@@ -366,62 +346,37 @@ function cameraHealth(req, res) {
               });
 
               logger.info(`Auto-updated lowImages status for camera ${camera.camera}: OFF (yesterday's count: ${firstDayCount})`);
-            } else {
-              // Status was never marked, just ensure it's false without logging
-              nextStatus.lowImages = false;
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
             }
           }
         }
 
         // Automatically update wrongTime status based on images starting with "2000"
-        const currentlyWrongTime = !!currentStatus.wrongTime;
+        const currentlyWrongTime = currentStatusFromHistory.wrongTime;
         if (hasWrongTime !== currentlyWrongTime) {
-          const nextStatus = { ...currentStatus };
           const now = new Date().toISOString();
           
           if (hasWrongTime) {
-            // Marking as wrong time - set the marking date only if not already set
-            nextStatus.wrongTime = true;
-            if (!nextStatus.wrongTimeMarkedAt) {
-              nextStatus.wrongTimeMarkedBy = 'System';
-              nextStatus.wrongTimeMarkedAt = now;
+            // Marking as wrong time - only log if not already marked
+            if (!currentlyWrongTime) {
+              // Log the status change in history
+              cameraStatusHistoryController.recordStatusChange({
+                cameraId: camera._id,
+                cameraName: camera.camera,
+                developerId: camera.developer,
+                projectId: camera.project,
+                statusType: 'wrongTime',
+                action: 'on',
+                performedBy: 'System',
+                performedByEmail: 'system@auto',
+                performedAt: now,
+              });
+
+              logger.info(`Auto-updated wrongTime status for camera ${camera.camera}: ON`);
             }
-            // Clear removal tracking when marking
-            nextStatus.wrongTimeRemovedBy = undefined;
-            nextStatus.wrongTimeRemovedAt = undefined;
-            
-            // Update the camera
-            cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-            // Log the status change in history (only when marking)
-            cameraStatusHistoryController.recordStatusChange({
-              cameraId: camera._id,
-              cameraName: camera.camera,
-              developerId: camera.developer,
-              projectId: camera.project,
-              statusType: 'wrongTime',
-              action: 'on',
-              performedBy: 'System',
-              performedByEmail: 'system@auto',
-              performedAt: now,
-            });
-
-            logger.info(`Auto-updated wrongTime status for camera ${camera.camera}: ON`);
           } else {
             // Clearing wrong time - only log removal if it was previously marked
-            if (currentlyWrongTime && currentStatus.wrongTimeMarkedAt) {
-              nextStatus.wrongTime = false;
-              if (!nextStatus.wrongTimeRemovedAt) {
-                nextStatus.wrongTimeRemovedBy = 'System';
-                nextStatus.wrongTimeRemovedAt = now;
-              }
-              // Keep the original marking info for history
-
-              // Update the camera
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-              // Log the status change in history (only when actually removing a previously marked status)
+            if (currentlyWrongTime) {
+              // Log the status change in history
               cameraStatusHistoryController.recordStatusChange({
                 cameraId: camera._id,
                 cameraName: camera.camera,
@@ -435,16 +390,12 @@ function cameraHealth(req, res) {
               });
 
               logger.info(`Auto-updated wrongTime status for camera ${camera.camera}: OFF`);
-            } else {
-              // Status was never marked, just ensure it's false without logging
-              nextStatus.wrongTime = false;
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
             }
           }
         }
 
         // Automatically update shutterExpiry status based on shutter count > 10000
-        const currentlyShutterExpiry = !!currentStatus.shutterExpiry;
+        const currentlyShutterExpiry = currentStatusFromHistory.shutterExpiry;
         
         // Log debug info for shutter expiry check
         if (memory) {
@@ -454,52 +405,30 @@ function cameraHealth(req, res) {
         }
         
         if (hasShutterExpiry !== currentlyShutterExpiry) {
-          const nextStatus = { ...currentStatus };
           const now = new Date().toISOString();
           
           if (hasShutterExpiry) {
-            // Marking as shutter expiry - set the marking date only if not already set
-            nextStatus.shutterExpiry = true;
-            if (!nextStatus.shutterExpiryMarkedAt) {
-              nextStatus.shutterExpiryMarkedBy = 'System';
-              nextStatus.shutterExpiryMarkedAt = now;
+            // Marking as shutter expiry - only log if not already marked
+            if (!currentlyShutterExpiry) {
+              // Log the status change in history
+              cameraStatusHistoryController.recordStatusChange({
+                cameraId: camera._id,
+                cameraName: camera.camera,
+                developerId: camera.developer,
+                projectId: camera.project,
+                statusType: 'shutterExpiry',
+                action: 'on',
+                performedBy: 'System',
+                performedByEmail: 'system@auto',
+                performedAt: now,
+              });
+
+              logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: ON (shutter count: ${shutterCount}, memory: ${memory ? 'found' : 'not found'})`);
             }
-            // Clear removal tracking when marking
-            nextStatus.shutterExpiryRemovedBy = undefined;
-            nextStatus.shutterExpiryRemovedAt = undefined;
-            
-            // Update the camera
-            cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-            // Log the status change in history (only when marking)
-            cameraStatusHistoryController.recordStatusChange({
-              cameraId: camera._id,
-              cameraName: camera.camera,
-              developerId: camera.developer,
-              projectId: camera.project,
-              statusType: 'shutterExpiry',
-              action: 'on',
-              performedBy: 'System',
-              performedByEmail: 'system@auto',
-              performedAt: now,
-            });
-
-            logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: ON (shutter count: ${shutterCount}, memory: ${memory ? 'found' : 'not found'})`);
           } else {
             // Clearing shutter expiry - only log removal if it was previously marked
-            // This prevents logging removals for cameras that were never marked
-            if (currentlyShutterExpiry && currentStatus.shutterExpiryMarkedAt) {
-              nextStatus.shutterExpiry = false;
-              if (!nextStatus.shutterExpiryRemovedAt) {
-                nextStatus.shutterExpiryRemovedBy = 'System';
-                nextStatus.shutterExpiryRemovedAt = now;
-              }
-              // Keep the original marking info for history
-
-              // Update the camera
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-              // Log the status change in history (only when actually removing a previously marked status)
+            if (currentlyShutterExpiry) {
+              // Log the status change in history
               cameraStatusHistoryController.recordStatusChange({
                 cameraId: camera._id,
                 cameraName: camera.camera,
@@ -513,10 +442,6 @@ function cameraHealth(req, res) {
               });
 
               logger.info(`Auto-updated shutterExpiry status for camera ${camera.camera}: OFF (shutter count: ${shutterCount}, memory: ${memory ? 'found' : 'not found'})`);
-            } else {
-              // Status was never marked, just ensure it's false without logging
-              nextStatus.shutterExpiry = false;
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
             }
           }
         }
@@ -543,53 +468,33 @@ function cameraHealth(req, res) {
           }
         }
 
-        const currentlyDeviceExpiry = !!currentStatus.deviceExpiry;
+        const currentlyDeviceExpiry = currentStatusFromHistory.deviceExpiry;
 
         if (hasDeviceExpired !== currentlyDeviceExpiry) {
-          const nextStatus = { ...currentStatus };
           const now = new Date().toISOString();
           
           if (hasDeviceExpired) {
-            // Marking as device expiry - set the marking date only if not already set
-            nextStatus.deviceExpiry = true;
-            if (!nextStatus.deviceExpiryMarkedAt) {
-              nextStatus.deviceExpiryMarkedBy = 'System';
-              nextStatus.deviceExpiryMarkedAt = now;
+            // Marking as device expiry - only log if not already marked
+            if (!currentlyDeviceExpiry) {
+              // Log the status change in history
+              cameraStatusHistoryController.recordStatusChange({
+                cameraId: camera._id,
+                cameraName: camera.camera,
+                developerId: camera.developer,
+                projectId: camera.project,
+                statusType: 'deviceExpiry',
+                action: 'on',
+                performedBy: 'System',
+                performedByEmail: 'system@auto',
+                performedAt: now,
+              });
+
+              logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: ON (inventory items checked: ${inventoryItems.length})`);
             }
-            // Clear removal tracking when marking
-            nextStatus.deviceExpiryRemovedBy = undefined;
-            nextStatus.deviceExpiryRemovedAt = undefined;
-            
-            // Update the camera
-            cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-            // Log the status change in history (only when marking)
-            cameraStatusHistoryController.recordStatusChange({
-              cameraId: camera._id,
-              cameraName: camera.camera,
-              developerId: camera.developer,
-              projectId: camera.project,
-              statusType: 'deviceExpiry',
-              action: 'on',
-              performedBy: 'System',
-              performedByEmail: 'system@auto',
-              performedAt: now,
-            });
-
-            logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: ON (inventory items checked: ${inventoryItems.length})`);
           } else {
             // Clearing device expiry - only log removal if it was previously marked
-            if (currentlyDeviceExpiry && currentStatus.deviceExpiryMarkedAt) {
-              nextStatus.deviceExpiry = false;
-              if (!nextStatus.deviceExpiryRemovedAt) {
-                nextStatus.deviceExpiryRemovedBy = 'System';
-                nextStatus.deviceExpiryRemovedAt = now;
-              }
-
-              // Update the camera
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
-
-              // Log the status change in history (only when actually removing a previously marked status)
+            if (currentlyDeviceExpiry) {
+              // Log the status change in history
               cameraStatusHistoryController.recordStatusChange({
                 cameraId: camera._id,
                 cameraName: camera.camera,
@@ -603,10 +508,6 @@ function cameraHealth(req, res) {
               });
 
               logger.info(`Auto-updated deviceExpiry status for camera ${camera.camera}: OFF (inventory items checked: ${inventoryItems.length})`);
-            } else {
-              // Status was never marked, just ensure it's false without logging
-              nextStatus.deviceExpiry = false;
-              cameraData.updateItem(camera._id, { maintenanceStatus: nextStatus });
             }
           }
         }

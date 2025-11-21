@@ -144,7 +144,9 @@ function cameraHealth(req, res) {
         if (typeof rawShutterCount === 'number') {
           shutterCount = rawShutterCount;
         } else if (typeof rawShutterCount === 'string') {
-          const parsed = parseInt(rawShutterCount, 10);
+          // Remove commas and other formatting characters before parsing
+          const cleaned = rawShutterCount.replace(/[,.\s]/g, '');
+          const parsed = parseInt(cleaned, 10);
           shutterCount = isNaN(parsed) ? null : parsed;
         }
       }

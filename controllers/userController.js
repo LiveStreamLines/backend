@@ -71,7 +71,7 @@ function addUser(req, res) {
         'hasUaeAccess', 'hasSaudiAccess', 'hasCameraMonitorAccess',
         'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
         'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
-        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canSeeAllInventory',
+        'canTogglePhotoDirtyBetterView', 'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canSeeAllInventory',
         'canAssignToUser', 'canArchiveMemory', 'isActive'
     ];
     booleanFields.forEach(field => {
@@ -179,7 +179,7 @@ function updateUser(req, res) {
         'hasUaeAccess', 'hasSaudiAccess', 'hasCameraMonitorAccess',
         'hasInventoryAccess', 'hasMemoryAccess', 'canAddUser', 'canGenerateVideoAndPics',
         'canWatchCameraMonitor', 'canCreateMonitorTask', 'canHoldMaintenance', 'canDeletePhoto',
-        'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canSeeAllInventory',
+        'canTogglePhotoDirtyBetterView', 'canSeeAllTasks', 'canAddDeviceType', 'canAddDeviceStock', 'canSeeAllInventory',
         'canAssignToUser', 'canArchiveMemory', 'isActive'
     ];
     booleanFields.forEach(field => {

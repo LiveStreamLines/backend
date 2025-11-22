@@ -40,33 +40,64 @@ function calculateValidityLeft(inventoryItem, deviceTypes) {
   
   // Calculate age in days
   let ageInDays = 0;
+  let hasRange = false;
   
   // Add estimated age if present
   if (inventoryItem.estimatedAge) {
     const estimatedAge = parseInt(inventoryItem.estimatedAge, 10);
     if (!isNaN(estimatedAge) && estimatedAge > 0) {
       ageInDays += estimatedAge;
+      hasRange = true;
     }
   }
   
-  // Calculate from assignment date
+  // Helper function to calculate duration between dates
+  const calculateDuration = (start, end) => {
+    if (!start) return 0;
+    const startDate = new Date(start);
+    if (isNaN(startDate.getTime())) return 0;
+    const endDate = end ? new Date(end) : new Date();
+    if (isNaN(endDate.getTime())) return 0;
+    const milliseconds = endDate.getTime() - startDate.getTime();
+    if (milliseconds <= 0) return 0;
+    return Math.floor(milliseconds / (1000 * 60 * 60 * 24));
+  };
+  
+  // Calculate from current assignment date
   if (inventoryItem.currentAssignment?.assignedDate) {
-    const assignedDate = new Date(inventoryItem.currentAssignment.assignedDate);
-    const now = new Date();
-    if (!isNaN(assignedDate.getTime())) {
-      const daysSinceAssignment = Math.floor((now - assignedDate) / (1000 * 60 * 60 * 24));
-      ageInDays += daysSinceAssignment;
+    const duration = calculateDuration(
+      inventoryItem.currentAssignment.assignedDate,
+      inventoryItem.currentAssignment.removedDate
+    );
+    if (duration > 0) {
+      ageInDays += duration;
+      hasRange = true;
     }
   }
   
-  // Calculate from created date if no assignment
-  if (!inventoryItem.currentAssignment && inventoryItem.createdDate) {
-    const createdDate = new Date(inventoryItem.createdDate);
-    const now = new Date();
-    if (!isNaN(createdDate.getTime())) {
-      const daysSinceCreation = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
-      ageInDays += daysSinceCreation;
+  // Calculate from assignment history (previous assignments)
+  if (inventoryItem.assignmentHistory && Array.isArray(inventoryItem.assignmentHistory)) {
+    for (const assignment of inventoryItem.assignmentHistory) {
+      const duration = calculateDuration(assignment.assignedDate, assignment.removedDate);
+      if (duration > 0) {
+        ageInDays += duration;
+        hasRange = true;
+      }
     }
+  }
+  
+  // Calculate from created date if no assignment history
+  if (!hasRange && inventoryItem.createdDate) {
+    const duration = calculateDuration(inventoryItem.createdDate, null);
+    if (duration > 0) {
+      ageInDays += duration;
+      hasRange = true;
+    }
+  }
+  
+  // If we couldn't calculate age, return null
+  if (!hasRange) {
+    return null;
   }
   
   return totalValidity - ageInDays;
@@ -76,7 +107,7 @@ function calculateValidityLeft(inventoryItem, deviceTypes) {
 function getInventoryItemsByCamera(cameraId, cameraName, developerId, projectId) {
   const allItems = inventoryData.getAllItems();
   
-  return allItems.filter(item => {
+  const matchedItems = allItems.filter(item => {
     // Only check items that are assigned (status === 'assigned')
     // Items with status 'available' or 'user_assigned' are not assigned to cameras
     if (item.status !== 'assigned') {
@@ -122,6 +153,11 @@ function getInventoryItemsByCamera(cameraId, cameraName, developerId, projectId)
             return true;
           }
         }
+      } else {
+        // If assignment exists but no camera field, check if developer/project match
+        // This handles cases where camera might not be explicitly set but item is assigned to the project
+        // However, we should only match if camera is explicitly set, so return false here
+        return false;
       }
     }
     
@@ -138,6 +174,15 @@ function getInventoryItemsByCamera(cameraId, cameraName, developerId, projectId)
     
     return false;
   });
+  
+  // Log for debugging
+  if (matchedItems.length === 0) {
+    logger.debug(`getInventoryItemsByCamera: No items found for camera ${cameraName} (ID: ${cameraId}), Developer: ${developerId}, Project: ${projectId}`);
+  } else {
+    logger.debug(`getInventoryItemsByCamera: Found ${matchedItems.length} items for camera ${cameraName} (ID: ${cameraId})`);
+  }
+  
+  return matchedItems;
 }
 
 function healthCheck(req, res) {
@@ -479,11 +524,19 @@ function cameraHealth(req, res) {
         }
 
         // Automatically update deviceExpiry status based on assigned inventory items
+        // Extract actual developer and project IDs from camera object (not tags from route params)
+        const actualDeveloperId = typeof camera.developer === 'object' 
+          ? camera.developer._id 
+          : camera.developer;
+        const actualProjectId = typeof camera.project === 'object' 
+          ? camera.project._id 
+          : camera.project;
+        
         const inventoryItems = getInventoryItemsByCamera(
           camera._id, 
           camera.camera, 
-          developerId, 
-          projectId
+          actualDeveloperId, 
+          actualProjectId
         );
         const deviceTypes = deviceTypeData.getAllItems();
 
@@ -491,7 +544,7 @@ function cameraHealth(req, res) {
         let expiredItemDetails = null;
         
         if (inventoryItems.length > 0) {
-          logger.info(`Checking device expiry for camera ${camera.camera}: ${inventoryItems.length} assigned inventory items`);
+          logger.info(`Checking device expiry for camera ${camera.camera} (ID: ${camera._id}): ${inventoryItems.length} assigned inventory items`);
           
           // Check if any assigned device has validityLeft <= 0
           for (const item of inventoryItems) {
@@ -500,9 +553,13 @@ function cameraHealth(req, res) {
             // Log details for debugging
             const deviceName = item.device?.deviceName || item.device?.model || 'Unknown device';
             const serialNumber = item.device?.serialNumber || item._id;
+            const deviceType = item.device?.type || 'Unknown type';
+            
+            // Log item details for debugging
+            logger.info(`Camera ${camera.camera}, checking item ${serialNumber} (${deviceName}, type: ${deviceType}): validityLeft=${validityLeft}, status=${item.status}, hasCurrentAssignment=${!!item.currentAssignment}`);
             
             if (validityLeft === null) {
-              logger.debug(`Cannot calculate validity for camera ${camera.camera}, item ${serialNumber} (${deviceName}): missing validity data`);
+              logger.warn(`Cannot calculate validity for camera ${camera.camera}, item ${serialNumber} (${deviceName}): missing validity data. Device type: ${deviceType}, item validityDays: ${item.validityDays}, estimatedAge: ${item.estimatedAge}`);
               continue;
             }
             
@@ -521,7 +578,19 @@ function cameraHealth(req, res) {
             }
           }
         } else {
-          logger.debug(`No assigned inventory items found for camera ${camera.camera} (ID: ${camera._id}, Developer: ${developerId}, Project: ${projectId})`);
+          logger.warn(`No assigned inventory items found for camera ${camera.camera} (ID: ${camera._id}, Developer ID: ${actualDeveloperId}, Project ID: ${actualProjectId}). Checking all inventory items for debugging...`);
+          
+          // Debug: Log all inventory items to see why none match
+          const allItems = inventoryData.getAllItems();
+          const assignedItems = allItems.filter(item => item.status === 'assigned');
+          logger.info(`Total inventory items: ${allItems.length}, Items with status 'assigned': ${assignedItems.length}`);
+          
+          // Log a few assigned items for debugging
+          for (let i = 0; i < Math.min(5, assignedItems.length); i++) {
+            const item = assignedItems[i];
+            const assignment = item.currentAssignment;
+            logger.info(`Sample assigned item ${i + 1}: ID=${item._id}, status=${item.status}, hasCurrentAssignment=${!!assignment}, assignment.developer=${assignment?.developer}, assignment.project=${assignment?.project}, assignment.camera=${assignment?.camera}`);
+          }
         }
 
         const currentlyDeviceExpiry = currentStatusFromHistory.deviceExpiry;

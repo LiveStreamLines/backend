@@ -110,10 +110,25 @@ function getDeveloperbyTag(req, res){
 // Controller for adding a new developer
 function addDeveloper(req, res) {
     try {
+        // Parse contacts if it's a JSON string
+        let contacts = [];
+        if (req.body.contacts) {
+            if (typeof req.body.contacts === 'string') {
+                try {
+                    contacts = JSON.parse(req.body.contacts);
+                } catch (e) {
+                    logger.warn('Failed to parse contacts JSON', e);
+                }
+            } else if (Array.isArray(req.body.contacts)) {
+                contacts = req.body.contacts;
+            }
+        }
+
         const payload = {
             ...req.body,
             internalDescription: req.body.internalDescription || '',
             internalAttachments: [],
+            contacts: contacts,
         };
 
         const addedDeveloper = developerData.addItem(payload);
@@ -148,9 +163,25 @@ function addDeveloper(req, res) {
 function updateDeveloper(req, res) {
     try {
         const developerId = req.params.id;
+        
+        // Parse contacts if it's a JSON string
+        let contacts = [];
+        if (req.body.contacts) {
+            if (typeof req.body.contacts === 'string') {
+                try {
+                    contacts = JSON.parse(req.body.contacts);
+                } catch (e) {
+                    logger.warn('Failed to parse contacts JSON', e);
+                }
+            } else if (Array.isArray(req.body.contacts)) {
+                contacts = req.body.contacts;
+            }
+        }
+        
         const updatedData = {
             ...req.body,
             internalDescription: req.body.internalDescription || '',
+            contacts: contacts,
         };
         delete updatedData.internalAttachments;
 

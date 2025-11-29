@@ -152,7 +152,7 @@ function resetPassword(req, res) {
     }
 
     // Find user by token
-    const user = userData.getUserByToken(token);
+    const user = operationusersData.getUserByToken(token);
    
     if (user.length === 0) {
       return res.status(400).json({ msg: 'Invalid or expired token' });

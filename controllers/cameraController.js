@@ -3,7 +3,7 @@ const path = require('path');
 const cameraData = require('../models/cameraData');
 const developerData = require('../models/developerData');
 const projectData = require("../models/projectData");
-const userData = require('../models/userData');
+const operationusersData = require('../models/operationusersData');
 const logger = require('../logger');
 const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 
@@ -75,7 +75,7 @@ function resolveUserIdentity(req) {
     const resolvedEmail = req.user?.email ?? null;
 
     if (req.user && req.user.email) {
-        const users = userData.getAllItems();
+        const users = operationusersData.getAllItems();
         const user = users.find(u => u.email === req.user.email);
         if (user) {
             resolvedName = user.name || user._id || 'Unknown';

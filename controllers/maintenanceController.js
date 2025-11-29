@@ -1,5 +1,5 @@
 const maintenanceData = require('../models/maintenanceData');
-const userData = require('../models/userData');
+const operationusersData = require('../models/operationusersData');
 const logger = require('../logger');
 const path = require('path');
 const fs = require('fs');
@@ -55,7 +55,7 @@ const maintenanceController = {
             if (!taskData.addedUserId && req.user) {
                 // JWT token contains email, so look up user by email to get _id
                 if (req.user.email) {
-                    const users = userData.getAllItems();
+                    const users = operationusersData.getAllItems();
                     const user = users.find(u => u.email === req.user.email);
                     if (user) {
                         // Ensure we save the user ID (_id), not the name
@@ -78,7 +78,7 @@ const maintenanceController = {
                 // If it looks like a name (contains spaces or is too short), try to find the user
                 if (taskData.addedUserId.length < 10 || taskData.addedUserId.includes(' ')) {
                     logger.warn('addedUserId appears to be a name, looking up user', { addedUserId: taskData.addedUserId });
-                    const users = userData.getAllItems();
+                    const users = operationusersData.getAllItems();
                     const user = users.find(u => u.name === taskData.addedUserId || u.email === taskData.addedUserId);
                     if (user) {
                         taskData.addedUserId = user._id;

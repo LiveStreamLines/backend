@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const twilio = require('twilio');
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const userData = require('../models/userData'); // Import user data module
+const operationusersData = require('../models/operationusersData');
 const logger = require('../logger');
 
 // Generate and Send OTP
@@ -12,7 +12,7 @@ exports.sendOtp = (req, res) => {
     return res.status(400).json({ error: 'Phone number is required' });
   }
 
-  const user = userData.findUserByPhone(phone);
+  const user = operationusersData.findUserByPhone(phone);
 
   if (user && !user.isActive) {
       return res.status(403).json({ msg: 'User account is inactive' });
@@ -44,15 +44,15 @@ exports.verifyOtp = (req, res) => {
         let user;
         if (userId) {
             // If userId is provided, associate the phone with the user
-            user = userData.getItemById(userId);
+            user = operationusersData.getItemById(userId);
             if (user) {
                 user.phone = phone; // Associate the phone number
                 user.status = "active";
-                userData.updateItem(userId, user); // Save updated user data
+                operationusersData.updateItem(userId, user); // Save updated user data
             }
         } else {
             // For phone login, find user by phone
-            user = userData.findUserByPhone(phone);
+            user = operationusersData.findUserByPhone(phone);
         }
 
         if (!user) {
@@ -77,7 +77,7 @@ exports.verifyOtp = (req, res) => {
           // const services = user.accessibleServices || [];
 
           const logintime = new Date().toISOString();
-          const updatedUser = userData.updateItem(user._id, {"LastLoginTime":logintime});
+          const updatedUser = operationusersData.updateItem(user._id, {"LastLoginTime":logintime});
           
 
           return res.json({ 

@@ -1,5 +1,5 @@
 const taskData = require('../models/taskData');
-const userData = require('../models/userData');
+const operationusersData = require('../models/operationusersData');
 const logger = require('../logger');
 const path = require('path');
 const fs = require('fs');
@@ -77,7 +77,7 @@ const getUserId = (req) => {
     
     // Try to get user ID from JWT token by looking up email
     if (req.user.email) {
-        const users = userData.getAllItems();
+        const users = operationusersData.getAllItems();
         const user = users.find(u => u.email === req.user.email);
         if (user) {
             return user._id;
@@ -154,7 +154,7 @@ function createTask(req, res) {
         }
 
         // Get user info
-        const users = userData.getAllItems();
+        const users = operationusersData.getAllItems();
         const assignedUser = users.find(u => u._id === userId);
         const assigneeUser = users.find(u => u._id === assignee);
         const approverUser = approver ? users.find(u => u._id === approver) : null;
@@ -234,7 +234,7 @@ function updateTask(req, res) {
 
         // Update assignee if provided
         if (assignee !== undefined) {
-            const users = userData.getAllItems();
+            const users = operationusersData.getAllItems();
             const assigneeUser = users.find(u => u._id === assignee);
             updateData.assignee = assignee.trim();
             updateData.assigneeName = assigneeUser?.name || '';
@@ -243,7 +243,7 @@ function updateTask(req, res) {
         // Update approver if provided
         if (approver !== undefined) {
             if (approver && approver.trim()) {
-                const users = userData.getAllItems();
+                const users = operationusersData.getAllItems();
                 const approverUser = users.find(u => u._id === approver);
                 updateData.approver = approver.trim();
                 updateData.approverName = approverUser?.name || '';
@@ -296,7 +296,7 @@ function addNote(req, res) {
         }
 
         // Verify user has permission (assignee, assigned, or approver)
-        const users = userData.getAllItems();
+        const users = operationusersData.getAllItems();
         const user = users.find(u => u._id === userId);
         
         const isAssignee = task.assignee === userId;

@@ -1,5 +1,5 @@
 // controllers/authController.js
-const userData = require('../models/userData'); // Import usersData here
+const operationusersData = require('../models/operationusersData'); // Import operationusersData here
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -14,7 +14,7 @@ const logoutBlacklist = new Set();
 function login(req, res) {
     const { email, password } = req.body;
     logger.info("request: ", req.body);
-    const user = userData.findUserByEmailAndPassword(email,password);
+    const user = operationusersData.findUserByEmailAndPassword(email,password);
     logger.info("info: ", user);
     const logintime = new Date().toISOString();
     logger.info("login time: ", logintime);
@@ -44,7 +44,7 @@ function login(req, res) {
       // const cameraIds = user.accessibleCameras || []; 
       // const services = user.accessibleServices || [];
       
-      const updatedUser = userData.updateItem(user._id, {"LastLoginTime":logintime});
+      const updatedUser = operationusersData.updateItem(user._id, {"LastLoginTime":logintime});
 
   
       res.json({ 
@@ -58,7 +58,7 @@ function login(req, res) {
 
 // Controller for getting a single User by Email
 function getUserByEmail(req, res) {
-  const user = userData.getUserByEmail(req.params.email);
+  const user = operationusersData.getUserByEmail(req.params.email);
   if (user) {
       res.json(user[0]._id);
   } else {
@@ -75,7 +75,7 @@ function sendResetPasswordLink(req, res) {
   }
 
   // Find user by user_id
-  const user = userData.getItemById(user_id); // Assume userData has a method for finding users by ID
+  const user = operationusersData.getItemById(user_id);
   if (!user) {
     return res.status(404).json({ msg: 'User not found' });
   }
@@ -85,7 +85,7 @@ function sendResetPasswordLink(req, res) {
   const tokenExpiry = Date.now() + 259200000; // 72 hour
 
   // Update user data with reset token and expiry
-  const updateuser =  userData.updateItem(user_id, {
+  const updateuser =  operationusersData.updateItem(user_id, {
     resetPasswordToken: resetToken,
     resetPasswordExpires: tokenExpiry,
     status: "Reset Password Sent"
@@ -167,7 +167,7 @@ function resetPassword(req, res) {
     const hashedPassword = newPassword;
 
    
-    const updated = userData.updateItem(user[0]._id, {
+    const updated = operationusersData.updateItem(user[0]._id, {
       password: hashedPassword,
       resetPasswordToken: null,
       resetPasswordExpires: null,
@@ -191,7 +191,7 @@ function forceLogoutUser(req, res) {
   const emailLower = email.toLowerCase();
   
   // Find user by email to verify they exist
-  const user = userData.getUserByEmail(emailLower);
+  const user = operationusersData.getUserByEmail(emailLower);
   
   if (!user || user.length === 0) {
     return res.status(404).json({ msg: 'User not found' });

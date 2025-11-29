@@ -29,6 +29,7 @@ const getImageRoutes = require('./routes/getImage');
 const healthRoutes = require('./routes/health');
 const cameraStatusHistoryRoutes = require('./routes/cameraStatusHistory');
 const contactRoutes = require('./routes/contacts');
+const taskRoutes = require('./routes/tasks');
 
 
 
@@ -74,6 +75,7 @@ app.use('/api/get-image', getImageRoutes);
 app.use('/health', healthRoutes);
 app.use('/api/camera-status-history', cameraStatusHistoryRoutes);
 app.use('/api/contacts', contactRoutes);
+app.use('/api/tasks', taskRoutes);
 
 
 

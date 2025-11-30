@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const logger = require('../logger');
 const authController = require('./authController');
+const operationAuthController = require('./operationAuthController');
 
 function authMiddleware(req, res, next) {
     // Get the token from the Authorization header
@@ -15,9 +16,9 @@ function authMiddleware(req, res, next) {
         // Verify the token
         const decoded = jwt.verify(token, 'secretKey');
         
-        // Check if user is blacklisted (force logout)
+        // Check if user is blacklisted (force logout) - check both controllers
         const userEmail = decoded.email || decoded.phone; // JWT might have email or phone
-        if (authController.isUserBlacklisted(userEmail)) {
+        if (authController.isUserBlacklisted(userEmail) || operationAuthController.isUserBlacklisted(userEmail)) {
             logger.info(`User ${userEmail} is blacklisted - forcing logout`);
             return res.status(403).json({ msg: 'Your session has been terminated. Please log in again.' });
         }

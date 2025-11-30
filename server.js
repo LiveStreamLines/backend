@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const logoRoutes = require('./routes/logo');
 const authRoutes = require('./routes/auth');
+const operationAuthRoutes = require('./routes/operationAuth');
 const developerRoutes = require('./routes/developers');
 const projectRoutes = require('./routes/projects');
 const cameraRoutes = require('./routes/cameras');
@@ -55,6 +56,7 @@ app.use('/public', express.static('public'));
 // Use routes
 app.use('/logos', logoRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/operation-auth', operationAuthRoutes);
 app.use('/api/developers', developerRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/cameras', cameraRoutes);

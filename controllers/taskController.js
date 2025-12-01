@@ -4,17 +4,7 @@ const logger = require('../logger');
 const path = require('path');
 const fs = require('fs');
 const DataModel = require('../models/DataModel');
-
-const MEDIA_ROOT = process.env.MEDIA_PATH || path.join(__dirname, '../media');
-const TASK_ATTACHMENTS_DIR = path.join(MEDIA_ROOT, 'attachments/tasks');
-
-const ensureDirectory = (dirPath) => {
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-};
-
-ensureDirectory(TASK_ATTACHMENTS_DIR);
+const s3Service = require('../utils/s3Service');
 
 const generateAttachmentId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
@@ -25,46 +15,63 @@ const getUploadedBy = (user) => {
     return user._id || user.id || user.userId || user.email || user.name || 'system';
 };
 
-const moveAttachments = (taskId, files = [], user, context = 'initial') => {
+const moveAttachments = async (taskId, files = [], user, context = 'initial') => {
     if (!files || files.length === 0) {
         return [];
     }
 
-    const attachmentsDir = path.join(TASK_ATTACHMENTS_DIR, taskId);
-    ensureDirectory(attachmentsDir);
-
     const uploadedBy = getUploadedBy(user);
     const attachments = [];
 
-    files.forEach((file) => {
-        const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-        const targetPath = path.join(attachmentsDir, newFileName);
+    for (const file of files) {
         try {
-            if (fs.existsSync(file.path)) {
-                fs.renameSync(file.path, targetPath);
-                attachments.push({
-                    _id: generateAttachmentId(),
-                    name: newFileName,
-                    originalName: file.originalname,
-                    size: file.size,
-                    type: file.mimetype,
-                    url: `/media/attachments/tasks/${taskId}/${newFileName}`,
-                    uploadedAt: new Date().toISOString(),
-                    uploadedBy,
-                    context, // 'initial' or 'note'
-                });
+            if (!fs.existsSync(file.path)) {
+                logger.warn(`File not found at temp path: ${file.path}`);
+                continue;
             }
+
+            const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+            const s3Key = s3Service.getTaskAttachmentKey(taskId, newFileName);
+
+            // Upload to S3
+            const uploadResult = await s3Service.uploadFileToS3(
+                file.path,
+                s3Key,
+                file.mimetype,
+                file.originalname
+            );
+
+            // Clean up temp file
+            try {
+                fs.unlinkSync(file.path);
+            } catch (unlinkError) {
+                logger.warn('Failed to clean up temp attachment', unlinkError);
+            }
+
+            attachments.push({
+                _id: generateAttachmentId(),
+                name: newFileName,
+                originalName: file.originalname,
+                size: file.size,
+                type: file.mimetype,
+                url: uploadResult.url,
+                s3Key: s3Key, // Store S3 key for deletion later
+                uploadedAt: new Date().toISOString(),
+                uploadedBy,
+                context, // 'initial' or 'note'
+            });
         } catch (error) {
-            logger.error('Failed to move attachment', error);
+            logger.error('Failed to upload attachment to S3', error);
+            // Clean up temp file on error
             try {
                 if (fs.existsSync(file.path)) {
                     fs.unlinkSync(file.path);
                 }
             } catch (unlinkError) {
-                logger.warn('Failed to clean up temp attachment', unlinkError);
+                logger.warn('Failed to clean up temp attachment on error', unlinkError);
             }
         }
-    });
+    }
 
     return attachments;
 };
@@ -133,7 +140,7 @@ function getTaskById(req, res) {
 }
 
 // Create new task
-function createTask(req, res) {
+async function createTask(req, res) {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -183,7 +190,7 @@ function createTask(req, res) {
         // Handle initial attachments
         const attachmentFiles = req.files || [];
         if (attachmentFiles.length > 0) {
-            const attachments = moveAttachments(taskId, attachmentFiles, req.user, 'initial');
+            const attachments = await moveAttachments(taskId, attachmentFiles, req.user, 'initial');
             if (attachments.length > 0) {
                 task.attachments = attachments;
                 taskData.updateItem(taskId, { attachments });
@@ -212,7 +219,7 @@ function createTask(req, res) {
 }
 
 // Update task
-function updateTask(req, res) {
+async function updateTask(req, res) {
     try {
         const taskId = req.params.id;
         const task = taskData.getItemById(taskId);
@@ -256,7 +263,7 @@ function updateTask(req, res) {
         // Handle attachments (for initial task attachments)
         const attachmentFiles = req.files || [];
         if (attachmentFiles.length > 0) {
-            const attachments = moveAttachments(taskId, attachmentFiles, req.user, 'initial');
+            const attachments = await moveAttachments(taskId, attachmentFiles, req.user, 'initial');
             if (attachments.length > 0) {
                 const existingAttachments = task.attachments || [];
                 updateData.attachments = [...existingAttachments, ...attachments];
@@ -272,7 +279,7 @@ function updateTask(req, res) {
 }
 
 // Add note to task
-function addNote(req, res) {
+async function addNote(req, res) {
     try {
         const taskId = req.params.id;
         const task = taskData.getItemById(taskId);
@@ -309,7 +316,7 @@ function addNote(req, res) {
 
         // Handle note attachments
         const attachmentFiles = req.files || [];
-        const noteAttachments = moveAttachments(taskId, attachmentFiles, req.user, 'note');
+        const noteAttachments = await moveAttachments(taskId, attachmentFiles, req.user, 'note');
 
         const newNote = {
             _id: generateAttachmentId(),
@@ -377,21 +384,35 @@ function closeTask(req, res) {
 }
 
 // Delete task
-function deleteTask(req, res) {
+async function deleteTask(req, res) {
     try {
         const taskId = req.params.id;
+        const task = taskData.getItemById(taskId);
+        
+        if (!task) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        // Delete all attachments from S3
+        const allAttachments = [
+            ...(task.attachments || []),
+            ...(task.notes || []).flatMap(note => note.attachments || [])
+        ];
+
+        for (const attachment of allAttachments) {
+            try {
+                const s3Key = attachment.s3Key || s3Service.extractKeyFromUrl(attachment.url);
+                if (s3Key) {
+                    await s3Service.deleteFromS3(s3Key);
+                }
+            } catch (error) {
+                logger.warn(`Failed to delete attachment from S3: ${attachment.url}`, error);
+            }
+        }
+
         const isDeleted = taskData.deleteItem(taskId);
         
         if (isDeleted) {
-            // Optionally delete attachments directory
-            const attachmentsDir = path.join(TASK_ATTACHMENTS_DIR, taskId);
-            if (fs.existsSync(attachmentsDir)) {
-                try {
-                    fs.rmSync(attachmentsDir, { recursive: true, force: true });
-                } catch (error) {
-                    logger.warn('Failed to delete task attachments directory', error);
-                }
-            }
             res.status(204).send();
         } else {
             res.status(404).json({ message: 'Task not found' });

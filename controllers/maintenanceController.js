@@ -4,6 +4,7 @@ const logger = require('../logger');
 const path = require('path');
 const fs = require('fs');
 const DataModel = require('../models/DataModel');
+const s3Service = require('../utils/s3Service');
 
 const maintenanceController = {
     // Get all maintenance requests
@@ -30,7 +31,7 @@ const maintenanceController = {
     },
 
     // Create new maintenance request
-    createMaintenance: (req, res) => {
+    createMaintenance: async (req, res) => {
         try {
             // Ensure creator information is registered with user ID (not just name)
             const taskData = { ...req.body };
@@ -97,24 +98,35 @@ const maintenanceController = {
             // Handle file attachments if any
             if (req.files && req.files.length > 0) {
                 try {
-                    // Create task-specific directory for attachments
-                    const taskAttachmentsDir = path.join(process.env.MEDIA_PATH, 'attachments/maintenance', taskId);
-                    if (!fs.existsSync(taskAttachmentsDir)) {
-                        fs.mkdirSync(taskAttachmentsDir, { recursive: true });
-                    }
-                    
                     const dataModel = new DataModel('temp');
                     const attachments = [];
                     
-                    // Move files from temp directory to task-specific directory
+                    // Upload files to S3
                     for (const file of req.files) {
-                        const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-                        const newFilePath = path.join(taskAttachmentsDir, newFileName);
-                        
-                        // Move file from temp location to task directory
-                        if (fs.existsSync(file.path)) {
-                            fs.renameSync(file.path, newFilePath);
-                            
+                        try {
+                            if (!fs.existsSync(file.path)) {
+                                logger.warn(`File not found at temp path: ${file.path}`);
+                                continue;
+                            }
+
+                            const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+                            const s3Key = s3Service.getMaintenanceAttachmentKey(taskId, newFileName);
+
+                            // Upload to S3
+                            const uploadResult = await s3Service.uploadFileToS3(
+                                file.path,
+                                s3Key,
+                                file.mimetype,
+                                file.originalname
+                            );
+
+                            // Clean up temp file
+                            try {
+                                fs.unlinkSync(file.path);
+                            } catch (unlinkError) {
+                                logger.warn('Failed to clean up temp attachment', unlinkError);
+                            }
+
                             // Create attachment object
                             const attachment = {
                                 _id: dataModel.generateCustomId(),
@@ -122,13 +134,24 @@ const maintenanceController = {
                                 originalName: file.originalname,
                                 size: file.size,
                                 type: file.mimetype,
-                                url: `/media/attachments/maintenance/${taskId}/${newFileName}`,
+                                url: uploadResult.url,
+                                s3Key: s3Key, // Store S3 key for deletion later
                                 uploadedAt: new Date().toISOString(),
                                 uploadedBy: taskData.addedUserId || req.user?.id || 'system',
                                 context: 'assignment' // Attachments uploaded during task creation
                             };
                             
                             attachments.push(attachment);
+                        } catch (uploadError) {
+                            logger.error('Error uploading attachment to S3:', uploadError);
+                            // Clean up temp file on error
+                            try {
+                                if (fs.existsSync(file.path)) {
+                                    fs.unlinkSync(file.path);
+                                }
+                            } catch (unlinkError) {
+                                logger.warn('Failed to clean up temp attachment on error', unlinkError);
+                            }
                         }
                     }
                     
@@ -152,7 +175,7 @@ const maintenanceController = {
     },
 
     // Update maintenance request
-    updateMaintenance: (req, res) => {
+    updateMaintenance: async (req, res) => {
         try {
             const taskId = req.params.id;
             const existingTask = maintenanceData.getItemById(taskId);
@@ -174,24 +197,35 @@ const maintenanceController = {
             // Handle file attachments if any
             if (req.files && req.files.length > 0) {
                 try {
-                    // Create task-specific directory for attachments if it doesn't exist
-                    const taskAttachmentsDir = path.join(process.env.MEDIA_PATH, 'attachments/maintenance', taskId);
-                    if (!fs.existsSync(taskAttachmentsDir)) {
-                        fs.mkdirSync(taskAttachmentsDir, { recursive: true });
-                    }
-                    
                     const dataModel = new DataModel('temp');
                     const newAttachments = [];
                     
-                    // Move files from temp directory to task-specific directory
+                    // Upload files to S3
                     for (const file of req.files) {
-                        const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-                        const newFilePath = path.join(taskAttachmentsDir, newFileName);
-                        
-                        // Move file from temp location to task directory
-                        if (fs.existsSync(file.path)) {
-                            fs.renameSync(file.path, newFilePath);
-                            
+                        try {
+                            if (!fs.existsSync(file.path)) {
+                                logger.warn(`File not found at temp path: ${file.path}`);
+                                continue;
+                            }
+
+                            const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+                            const s3Key = s3Service.getMaintenanceAttachmentKey(taskId, newFileName);
+
+                            // Upload to S3
+                            const uploadResult = await s3Service.uploadFileToS3(
+                                file.path,
+                                s3Key,
+                                file.mimetype,
+                                file.originalname
+                            );
+
+                            // Clean up temp file
+                            try {
+                                fs.unlinkSync(file.path);
+                            } catch (unlinkError) {
+                                logger.warn('Failed to clean up temp attachment', unlinkError);
+                            }
+
                             // Create attachment object
                             const attachment = {
                                 _id: dataModel.generateCustomId(),
@@ -199,13 +233,24 @@ const maintenanceController = {
                                 originalName: file.originalname,
                                 size: file.size,
                                 type: file.mimetype,
-                                url: `/media/attachments/maintenance/${taskId}/${newFileName}`,
+                                url: uploadResult.url,
+                                s3Key: s3Key, // Store S3 key for deletion later
                                 uploadedAt: new Date().toISOString(),
                                 uploadedBy: req.user?.id || req.user?._id || 'system',
                                 context: attachmentContext // 'assignment' or 'completion'
                             };
                             
                             newAttachments.push(attachment);
+                        } catch (uploadError) {
+                            logger.error('Error uploading attachment to S3:', uploadError);
+                            // Clean up temp file on error
+                            try {
+                                if (fs.existsSync(file.path)) {
+                                    fs.unlinkSync(file.path);
+                                }
+                            } catch (unlinkError) {
+                                logger.warn('Failed to clean up temp attachment on error', unlinkError);
+                            }
                         }
                     }
                     
@@ -232,9 +277,29 @@ const maintenanceController = {
     },
 
     // Delete maintenance request
-    deleteMaintenance: (req, res) => {
+    deleteMaintenance: async (req, res) => {
         try {
-            const success = maintenanceData.deleteItem(req.params.id);
+            const taskId = req.params.id;
+            const task = maintenanceData.getItemById(taskId);
+            
+            if (!task) {
+                return res.status(404).json({ message: 'Maintenance request not found' });
+            }
+
+            // Delete all attachments from S3
+            const allAttachments = task.attachments || [];
+            for (const attachment of allAttachments) {
+                try {
+                    const s3Key = attachment.s3Key || s3Service.extractKeyFromUrl(attachment.url);
+                    if (s3Key) {
+                        await s3Service.deleteFromS3(s3Key);
+                    }
+                } catch (error) {
+                    logger.warn(`Failed to delete attachment from S3: ${attachment.url}`, error);
+                }
+            }
+
+            const success = maintenanceData.deleteItem(taskId);
             if (!success) {
                 return res.status(404).json({ message: 'Maintenance request not found' });
             }

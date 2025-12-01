@@ -57,13 +57,44 @@ module.exports = {
                 return deviceType ? (deviceType.noSerial === true) : false;
             })();
 
-            // Include quantity if provided (for no-serial devices only)
+            // For no-serial devices, check if item with same type and model already exists
             if (isNoSerial && req.body.quantity !== undefined) {
-                newItem.quantity = req.body.quantity;
-                // Initialize inStock and assignment arrays for no-serial devices
-                newItem.inStock = req.body.quantity;
-                newItem.userAssignments = [];
-                newItem.projectAssignments = [];
+                const allItems = inventoryData.getAllItems();
+                const existingItem = allItems.find(item => {
+                    // Check if it's a no-serial item (has quantity field and no serialNumber)
+                    const itemIsNoSerial = item.quantity !== undefined && !item.device?.serialNumber;
+                    if (!itemIsNoSerial) return false;
+                    
+                    // Check if device type matches (case-insensitive)
+                    const itemType = (item.device?.type || '').trim().toLowerCase();
+                    const newType = (req.body.device?.type || '').trim().toLowerCase();
+                    if (itemType !== newType) return false;
+                    
+                    // Check if model matches (both may or may not have model)
+                    const itemModel = (item.device?.model || '').trim().toLowerCase();
+                    const newModel = (req.body.device?.model || '').trim().toLowerCase();
+                    return itemModel === newModel;
+                });
+                
+                if (existingItem) {
+                    // Add quantity to existing item
+                    const addQuantity = req.body.quantity;
+                    existingItem.quantity = (existingItem.quantity || 0) + addQuantity;
+                    existingItem.inStock = (existingItem.inStock || 0) + addQuantity;
+                    
+                    // Update the item
+                    const data = inventoryData.updateItem(existingItem._id, {
+                        quantity: existingItem.quantity,
+                        inStock: existingItem.inStock
+                    });
+                    return res.status(200).json({ success: true, data });
+                } else {
+                    // Create new item with quantity
+                    newItem.quantity = req.body.quantity;
+                    newItem.inStock = req.body.quantity;
+                    newItem.userAssignments = [];
+                    newItem.projectAssignments = [];
+                }
             }
             
             // Include country if provided

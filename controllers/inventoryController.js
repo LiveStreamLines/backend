@@ -42,6 +42,16 @@ module.exports = {
             if (req.body.estimatedAge !== undefined) {
                 newItem.estimatedAge = req.body.estimatedAge;
             }
+
+            // Include quantity if provided (for no-serial devices)
+            if (req.body.quantity !== undefined) {
+                newItem.quantity = req.body.quantity;
+            }
+            
+            // Include country if provided
+            if (req.body.country !== undefined) {
+                newItem.country = req.body.country;
+            }
             
             const data = inventoryData.addItem(newItem);
             res.status(201).json({ success: true, data });

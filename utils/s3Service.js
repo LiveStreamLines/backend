@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateBucketCommand, HeadBucketCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const fs = require('fs');
 const path = require('path');
@@ -22,6 +22,63 @@ const s3Client = new S3Client(S3_CONFIG);
 // S3 Bucket name (you may want to make this configurable via environment variable)
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'attachments';
 
+// Track if bucket existence has been checked
+let bucketChecked = false;
+
+/**
+ * Check if bucket exists, create if it doesn't
+ * @returns {Promise<void>}
+ */
+async function ensureBucketExists() {
+    // Only check once per runtime
+    if (bucketChecked) {
+        return;
+    }
+
+    try {
+        // Check if bucket exists
+        const headCommand = new HeadBucketCommand({
+            Bucket: BUCKET_NAME
+        });
+        
+        try {
+            await s3Client.send(headCommand);
+            logger.info(`S3 bucket "${BUCKET_NAME}" exists`);
+            bucketChecked = true;
+            return;
+        } catch (headError) {
+            if (headError.name === 'NotFound' || headError.$metadata?.httpStatusCode === 404 || headError.name === 'NoSuchBucket') {
+                // Bucket doesn't exist, try to create it
+                logger.warn(`S3 bucket "${BUCKET_NAME}" does not exist, attempting to create...`);
+                
+                try {
+                    const createCommand = new CreateBucketCommand({
+                        Bucket: BUCKET_NAME
+                        // Note: Some S3-compatible services don't need CreateBucketConfiguration
+                    });
+                    
+                    await s3Client.send(createCommand);
+                    logger.info(`Successfully created S3 bucket "${BUCKET_NAME}"`);
+                    bucketChecked = true;
+                } catch (createError) {
+                    logger.error(`Failed to create bucket "${BUCKET_NAME}". Error: ${createError.message}`);
+                    logger.error(`Please create the bucket "${BUCKET_NAME}" manually in your S3 console or set S3_BUCKET_NAME environment variable to an existing bucket.`);
+                    // Don't throw - let the upload attempt show the actual error
+                    bucketChecked = true;
+                }
+            } else {
+                // Other error, log but continue
+                logger.error(`Error checking bucket existence: ${headError.message}`);
+                bucketChecked = true;
+            }
+        }
+    } catch (error) {
+        logger.error(`Error ensuring bucket exists: ${error.message}`);
+        // Don't throw - let the upload attempt happen and show the real error
+        bucketChecked = true; // Set to true to avoid retrying
+    }
+}
+
 /**
  * Upload a file to S3
  * @param {Buffer|Stream} fileBuffer - The file buffer or stream
@@ -32,6 +89,9 @@ const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'attachments';
  */
 async function uploadToS3(fileBuffer, key, contentType, originalName) {
     try {
+        // Ensure bucket exists before uploading
+        await ensureBucketExists();
+        
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: key,
@@ -55,6 +115,14 @@ async function uploadToS3(fileBuffer, key, contentType, originalName) {
         };
     } catch (error) {
         logger.error('Error uploading file to S3:', error);
+        
+        // Provide helpful error message for bucket not found
+        if (error.name === 'NoSuchBucket' || error.Code === 'NoSuchBucket') {
+            const errorMsg = `S3 bucket "${BUCKET_NAME}" does not exist. Please create it manually in your S3 console (${S3_CONFIG.endpoint}) or set S3_BUCKET_NAME environment variable to an existing bucket name.`;
+            logger.error(errorMsg);
+            throw new Error(errorMsg);
+        }
+        
         throw new Error(`Failed to upload file to S3: ${error.message}`);
     }
 }
@@ -178,6 +246,7 @@ module.exports = {
     getMaintenanceAttachmentKey,
     getContactAttachmentKey,
     extractKeyFromUrl,
+    ensureBucketExists,
     BUCKET_NAME,
     s3Client
 };

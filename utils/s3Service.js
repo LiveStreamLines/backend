@@ -30,8 +30,11 @@ let bucketChecked = false;
  * @returns {Promise<void>}
  */
 async function ensureBucketExists() {
+    logger.info(`Checking if S3 bucket "${BUCKET_NAME}" exists...`);
+    
     // Only check once per runtime
     if (bucketChecked) {
+        logger.info(`Bucket check already performed, skipping...`);
         return;
     }
 
@@ -43,7 +46,7 @@ async function ensureBucketExists() {
         
         try {
             await s3Client.send(headCommand);
-            logger.info(`S3 bucket "${BUCKET_NAME}" exists`);
+            logger.info(`✓ S3 bucket "${BUCKET_NAME}" exists and is accessible`);
             bucketChecked = true;
             return;
         } catch (headError) {

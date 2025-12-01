@@ -33,6 +33,19 @@ const maintenanceController = {
     // Create new maintenance request
     createMaintenance: async (req, res) => {
         try {
+            // Log request details for debugging
+            logger.info('=== Create Maintenance Request ===');
+            logger.info('Request has files:', !!req.files);
+            logger.info('Files count:', req.files ? req.files.length : 0);
+            if (req.files && req.files.length > 0) {
+                logger.info('Files details:', req.files.map(f => ({
+                    originalname: f.originalname,
+                    path: f.path,
+                    size: f.size,
+                    mimetype: f.mimetype
+                })));
+            }
+            
             // Ensure creator information is registered with user ID (not just name)
             const taskData = { ...req.body };
             
@@ -91,12 +104,18 @@ const maintenanceController = {
                 logger.warn('Task created without creator ID (addedUserId)', { body: req.body, user: req.user });
             }
             
+            // Initialize attachments array in taskData
+            taskData.attachments = [];
+            
             // Create the maintenance task first to get its ID
             const maintenance = maintenanceData.addItem(taskData);
             const taskId = maintenance._id;
             
+            logger.info(`Created maintenance task ${taskId}, processing attachments...`);
+            
             // Handle file attachments if any
             if (req.files && req.files.length > 0) {
+                logger.info(`Processing ${req.files.length} attachment(s) for maintenance task ${taskId}`);
                 try {
                     const dataModel = new DataModel('temp');
                     const attachments = [];
@@ -104,6 +123,8 @@ const maintenanceController = {
                     // Upload files to S3
                     for (const file of req.files) {
                         try {
+                            logger.info(`Processing file: ${file.originalname}, path: ${file.path}`);
+                            
                             if (!fs.existsSync(file.path)) {
                                 logger.warn(`File not found at temp path: ${file.path}`);
                                 continue;
@@ -111,6 +132,8 @@ const maintenanceController = {
 
                             const newFileName = `${taskId}_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
                             const s3Key = s3Service.getMaintenanceAttachmentKey(taskId, newFileName);
+                            
+                            logger.info(`Uploading to S3 with key: ${s3Key}`);
 
                             // Upload to S3
                             const uploadResult = await s3Service.uploadFileToS3(
@@ -119,6 +142,8 @@ const maintenanceController = {
                                 file.mimetype,
                                 file.originalname
                             );
+                            
+                            logger.info(`Successfully uploaded to S3: ${uploadResult.url}`);
 
                             // Clean up temp file
                             try {
@@ -137,13 +162,19 @@ const maintenanceController = {
                                 url: uploadResult.url,
                                 s3Key: s3Key, // Store S3 key for deletion later
                                 uploadedAt: new Date().toISOString(),
-                                uploadedBy: taskData.addedUserId || req.user?.id || 'system',
+                                uploadedBy: taskData.addedUserId || req.user?.id || req.user?._id || 'system',
                                 context: 'assignment' // Attachments uploaded during task creation
                             };
                             
                             attachments.push(attachment);
+                            logger.info(`Added attachment to array: ${attachment._id}`);
                         } catch (uploadError) {
                             logger.error('Error uploading attachment to S3:', uploadError);
+                            logger.error('Upload error details:', {
+                                message: uploadError.message,
+                                stack: uploadError.stack,
+                                file: file.originalname
+                            });
                             // Clean up temp file on error
                             try {
                                 if (fs.existsSync(file.path)) {
@@ -157,14 +188,28 @@ const maintenanceController = {
                     
                     // Update maintenance task with attachments
                     if (attachments.length > 0) {
-                        maintenance.attachments = attachments;
-                        maintenanceData.updateItem(taskId, { attachments: attachments });
+                        logger.info(`Updating maintenance task ${taskId} with ${attachments.length} attachment(s)`);
+                        const updatedMaintenance = maintenanceData.updateItem(taskId, { attachments: attachments });
+                        if (updatedMaintenance) {
+                            maintenance = updatedMaintenance; // Update the maintenance object for response
+                            logger.info(`Successfully updated maintenance task with attachments`);
+                        } else {
+                            logger.error(`Failed to update maintenance task ${taskId} with attachments`);
+                        }
+                    } else {
+                        logger.warn(`No attachments were successfully uploaded for maintenance task ${taskId}`);
                     }
                 } catch (fileError) {
                     logger.error('Error processing attachments:', fileError);
+                    logger.error('File error details:', {
+                        message: fileError.message,
+                        stack: fileError.stack
+                    });
                     // Don't fail the entire request if file processing fails
                     // The task is already created, just log the error
                 }
+            } else {
+                logger.info(`No files attached to maintenance task ${taskId}`);
             }
             
             res.status(201).json(maintenance);

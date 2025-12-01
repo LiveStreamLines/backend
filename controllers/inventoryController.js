@@ -2,7 +2,7 @@ const inventoryData = require('../models/inventoryData');
 const developData = require('../models/developerData');
 const projectData = require('../models/projectData');
 const cameraData = require('../models/cameraData');
-
+const deviceTypeData = require('../models/deviceTypeData');
 
 const logger = require('../logger');
 
@@ -43,9 +43,27 @@ module.exports = {
                 newItem.estimatedAge = req.body.estimatedAge;
             }
 
-            // Include quantity if provided (for no-serial devices)
-            if (req.body.quantity !== undefined) {
+            // Check if device type is no-serial
+            const isNoSerial = (() => {
+                if (!req.body.device || !req.body.device.type) {
+                    return false;
+                }
+                const deviceTypes = deviceTypeData.getAllItems();
+                const deviceType = deviceTypes.find(dt => {
+                    const dtName = (dt.name || '').trim().toLowerCase();
+                    const itemTypeName = (req.body.device.type || '').trim().toLowerCase();
+                    return dtName === itemTypeName;
+                });
+                return deviceType ? (deviceType.noSerial === true) : false;
+            })();
+
+            // Include quantity if provided (for no-serial devices only)
+            if (isNoSerial && req.body.quantity !== undefined) {
                 newItem.quantity = req.body.quantity;
+                // Initialize inStock and assignment arrays for no-serial devices
+                newItem.inStock = req.body.quantity;
+                newItem.userAssignments = [];
+                newItem.projectAssignments = [];
             }
             
             // Include country if provided
@@ -96,7 +114,13 @@ module.exports = {
 
     unassignInventoryItem: function(req, res) {
         try {
-            const data = inventoryData.unassignItem(req.params.id, req.body.reason);
+            const projectData = req.body.developer && req.body.project && req.body.camera ? {
+                developer: req.body.developer,
+                project: req.body.project,
+                camera: req.body.camera,
+                qty: req.body.qty || null
+            } : null;
+            const data = inventoryData.unassignItem(req.params.id, req.body.reason, projectData);
             if (!data) {
                 return res.status(404).json({ 
                     success: false, 
@@ -111,7 +135,12 @@ module.exports = {
 
     unassignUserInventoryItem: function(req, res) {
         try {
-            const data = inventoryData.unassignUserItem(req.params.id, req.body.reason);
+            const data = inventoryData.unassignUserItem(
+                req.params.id, 
+                req.body.reason,
+                req.body.userId || null,
+                req.body.qty || null
+            );
             if (!data) {
                 return res.status(404).json({ 
                     success: false, 

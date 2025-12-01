@@ -108,7 +108,7 @@ const maintenanceController = {
             taskData.attachments = [];
             
             // Create the maintenance task first to get its ID
-            const maintenance = maintenanceData.addItem(taskData);
+            let maintenance = maintenanceData.addItem(taskData);
             const taskId = maintenance._id;
             
             logger.info(`Created maintenance task ${taskId}, processing attachments...`);

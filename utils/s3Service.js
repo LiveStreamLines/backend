@@ -107,14 +107,15 @@ async function uploadToS3(fileBuffer, key, contentType, originalName) {
 
         await s3Client.send(command);
 
-        // For path-style URLs with custom endpoint
-        // Use presigned URL for secure access, or construct path-style URL
-        const url = `https://s3.ap-southeast-1.idrivee2.com/${BUCKET_NAME}/${key}`;
+        // Generate presigned URL for private bucket access (valid for 7 days)
+        // This allows secure access to private files without making the bucket public
+        const presignedUrl = await getPresignedUrl(key, 7 * 24 * 60 * 60); // 7 days expiration
         
         logger.info(`File uploaded to S3: ${key}`);
         return {
-            url: url,
-            key: key
+            url: presignedUrl, // Return presigned URL instead of direct URL
+            key: key,
+            directUrl: `https://s3.ap-southeast-1.idrivee2.com/${BUCKET_NAME}/${key}` // Keep direct URL for reference
         };
     } catch (error) {
         logger.error('Error uploading file to S3:', error);
@@ -151,7 +152,7 @@ async function uploadFileToS3(filePath, key, contentType, originalName) {
 /**
  * Generate a presigned URL for accessing a file (valid for 1 hour by default)
  * @param {string} key - The S3 object key
- * @param {number} expiresIn - URL expiration time in seconds (default: 3600)
+ * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
  * @returns {Promise<string>}
  */
 async function getPresignedUrl(key, expiresIn = 3600) {
@@ -162,10 +163,31 @@ async function getPresignedUrl(key, expiresIn = 3600) {
         });
 
         const url = await getSignedUrl(s3Client, command, { expiresIn });
+        logger.info(`Generated presigned URL for key: ${key}, expires in ${expiresIn}s`);
         return url;
     } catch (error) {
         logger.error('Error generating presigned URL:', error);
         throw new Error(`Failed to generate presigned URL: ${error.message}`);
+    }
+}
+
+/**
+ * Generate a presigned URL from an S3 URL or key
+ * @param {string} urlOrKey - Full S3 URL or just the key
+ * @param {number} expiresIn - URL expiration time in seconds (default: 7 days)
+ * @returns {Promise<string>}
+ */
+async function getPresignedUrlFromUrl(urlOrKey, expiresIn = 7 * 24 * 60 * 60) {
+    try {
+        // Extract key from URL if full URL is provided
+        const key = extractKeyFromUrl(urlOrKey) || urlOrKey;
+        if (!key) {
+            throw new Error('Invalid URL or key provided');
+        }
+        return await getPresignedUrl(key, expiresIn);
+    } catch (error) {
+        logger.error('Error generating presigned URL from URL:', error);
+        throw error;
     }
 }
 
@@ -244,6 +266,7 @@ module.exports = {
     uploadToS3,
     uploadFileToS3,
     getPresignedUrl,
+    getPresignedUrlFromUrl,
     deleteFromS3,
     getTaskAttachmentKey,
     getMaintenanceAttachmentKey,

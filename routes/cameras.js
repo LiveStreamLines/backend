@@ -68,6 +68,26 @@ const attachmentUpload = multer({
     }
 });
 
+// Configure multer for internal attachment uploads (accepts 'file' field name)
+const internalAttachmentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const tempDir = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'attachments/cameras/temp');
+    ensureDir(tempDir);
+    cb(null, tempDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${ext}`);
+  },
+});
+const internalAttachmentUpload = multer({ 
+  storage: internalAttachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 router.get('/', cameraController.getAllCameras);
 router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
 router.get('/maintenance-cycle/start-date', cameraController.getMaintenanceCycleStartDate);
@@ -92,6 +112,7 @@ router.get('/:cameraId/attachments', cameraController.getCameraAttachments);
 router.delete('/:cameraId/attachments/:attachmentId', cameraController.deleteCameraAttachment);
 
 // Internal attachment routes
+router.post('/:id/internal-attachments', internalAttachmentUpload.single('file'), cameraController.uploadInternalAttachment);
 router.delete('/:id/internal-attachments/:attachmentId', cameraController.deleteInternalAttachment);
 
 module.exports = router;

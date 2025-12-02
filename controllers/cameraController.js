@@ -725,6 +725,40 @@ function deleteCameraAttachment(req, res) {
     }
 }
 
+// Controller for uploading an internal attachment
+async function uploadInternalAttachment(req, res) {
+    try {
+        const cameraId = req.params.id || req.params.cameraId;
+        const file = req.file;
+        
+        if (!file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const camera = cameraData.getItemById(cameraId);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        // Move file to temp directory first (multer already did this, but we need to process it)
+        const tempFiles = [{ ...file, originalname: file.originalname }];
+        const attachments = await moveInternalAttachments(cameraId, tempFiles, req.user);
+        
+        if (attachments.length > 0) {
+            const merged = [...(camera.internalAttachments || []), ...attachments];
+            const updatedCamera = cameraData.updateItem(cameraId, { internalAttachments: merged });
+            if (updatedCamera) {
+                return res.status(201).json(updatedCamera);
+            }
+        }
+
+        return res.status(500).json({ message: 'Failed to upload attachment' });
+    } catch (error) {
+        logger.error('Error uploading internal attachment', error);
+        return res.status(500).json({ message: 'Failed to upload attachment' });
+    }
+}
+
 async function deleteInternalAttachment(req, res) {
     try {
         const cameraId = req.params.id;
@@ -794,5 +828,6 @@ module.exports = {
     uploadCameraAttachment,
     getCameraAttachments,
     deleteCameraAttachment,
+    uploadInternalAttachment,
     deleteInternalAttachment
 };

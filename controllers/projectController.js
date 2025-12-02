@@ -417,6 +417,40 @@ async function deleteProjectAttachment(req, res) {
     }
 }
 
+// Controller for uploading an internal attachment
+async function uploadInternalAttachment(req, res) {
+    try {
+        const projectId = req.params.id || req.params.projectId;
+        const file = req.file;
+        
+        if (!file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const project = projectData.getItemById(projectId);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        // Move file to temp directory first (multer already did this, but we need to process it)
+        const tempFiles = [{ ...file, originalname: file.originalname }];
+        const attachments = await moveInternalAttachments(projectId, tempFiles, req.user);
+        
+        if (attachments.length > 0) {
+            const merged = [...(project.internalAttachments || []), ...attachments];
+            const updatedProject = projectData.updateItem(projectId, { internalAttachments: merged });
+            if (updatedProject) {
+                return res.status(201).json(updatedProject);
+            }
+        }
+
+        return res.status(500).json({ message: 'Failed to upload attachment' });
+    } catch (error) {
+        logger.error('Error uploading internal attachment', error);
+        return res.status(500).json({ message: 'Failed to upload attachment' });
+    }
+}
+
 // Controller for deleting an internal attachment
 async function deleteInternalAttachment(req, res) {
     try {
@@ -482,5 +516,6 @@ module.exports = {
     uploadProjectAttachment,
     getProjectAttachments,
     deleteProjectAttachment,
+    uploadInternalAttachment,
     deleteInternalAttachment
 };

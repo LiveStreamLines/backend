@@ -81,6 +81,26 @@ const attachmentUpload = multer({
     }
 });
 
+// Configure multer for internal attachment uploads (accepts 'file' field name)
+const internalAttachmentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const tempDir = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'attachments/projects/temp');
+    ensureDir(tempDir);
+    cb(null, tempDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${ext}`);
+  },
+});
+const internalAttachmentUpload = multer({ 
+  storage: internalAttachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 router.get('/', projectController.getAllProjects);
 router.get('/available-for-sales-order/:developerId', projectController.getAvailableProjectsForSalesOrder);
 router.get('/dev/:id', projectController.getProjectByDeveloper);
@@ -98,6 +118,7 @@ router.post('/:projectId/attachments', attachmentUpload.single('file'), projectC
 router.get('/:projectId/attachments', projectController.getProjectAttachments);
 
 // Internal attachment routes
+router.post('/:id/internal-attachments', internalAttachmentUpload.single('file'), projectController.uploadInternalAttachment);
 router.delete('/:id/internal-attachments/:attachmentId', projectController.deleteInternalAttachment);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const developerData = require('../models/developerData');
 const path = require('path');
 const fs = require('fs');
 const logger = require('../logger');
+const s3Service = require('../utils/s3Service');
 
 const MEDIA_ROOT = process.env.MEDIA_PATH || path.join(__dirname, '../media');
 const LOGO_DIR = path.join(MEDIA_ROOT, 'logos/developer');
@@ -27,41 +28,62 @@ const getUploadedBy = (user) => {
     return user._id || user.id || user.userId || user.email || user.name || 'system';
 };
 
-const moveInternalAttachments = (developerId, files = [], user) => {
+const moveInternalAttachments = async (developerId, files = [], user) => {
     if (!files || files.length === 0) {
         return [];
     }
 
-    const attachmentsDir = path.join(DEVELOPER_ATTACHMENTS_DIR, developerId);
-    ensureDirectory(attachmentsDir);
-
     const uploadedBy = getUploadedBy(user);
     const attachments = [];
 
-    files.forEach((file) => {
-        const newFileName = `${developerId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-        const targetPath = path.join(attachmentsDir, newFileName);
+    for (const file of files) {
         try {
-            fs.renameSync(file.path, targetPath);
+            if (!fs.existsSync(file.path)) {
+                logger.warn(`File not found at temp path: ${file.path}`);
+                continue;
+            }
+
+            const newFileName = `${developerId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+            const s3Key = s3Service.getDeveloperInternalAttachmentKey(developerId, newFileName);
+
+            // Upload to S3
+            const uploadResult = await s3Service.uploadFileToS3(
+                file.path,
+                s3Key,
+                file.mimetype,
+                file.originalname
+            );
+
+            // Clean up temp file
+            try {
+                fs.unlinkSync(file.path);
+            } catch (unlinkError) {
+                logger.warn('Failed to clean up temp attachment', unlinkError);
+            }
+
             attachments.push({
                 _id: generateAttachmentId(),
                 name: newFileName,
                 originalName: file.originalname,
                 size: file.size,
                 type: file.mimetype,
-                url: `/media/attachments/developers/${developerId}/${newFileName}`,
+                url: uploadResult.url,
+                s3Key: s3Key, // Store S3 key for deletion later
                 uploadedAt: new Date().toISOString(),
                 uploadedBy,
             });
         } catch (error) {
-            logger.error('Failed to move internal attachment', error);
+            logger.error('Failed to upload internal attachment to S3', error);
+            // Clean up temp file on error
             try {
-                fs.unlinkSync(file.path);
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
             } catch (unlinkError) {
-                logger.warn('Failed to clean up temp attachment', unlinkError);
+                logger.warn('Failed to clean up temp attachment on error', unlinkError);
             }
         }
-    });
+    }
 
     return attachments;
 };
@@ -108,7 +130,7 @@ function getDeveloperbyTag(req, res){
 }
 
 // Controller for adding a new developer
-function addDeveloper(req, res) {
+async function addDeveloper(req, res) {
     try {
         // Parse contacts if it's a JSON string
         let contacts = [];
@@ -146,7 +168,7 @@ function addDeveloper(req, res) {
 
         const attachmentFiles = req.files?.internalAttachments || [];
         if (attachmentFiles.length > 0) {
-            const attachments = moveInternalAttachments(addedDeveloper._id, attachmentFiles, req.user);
+            const attachments = await moveInternalAttachments(addedDeveloper._id, attachmentFiles, req.user);
             if (attachments.length > 0) {
                 response = developerData.updateItem(addedDeveloper._id, { internalAttachments: attachments }) || response;
             }
@@ -160,7 +182,7 @@ function addDeveloper(req, res) {
 }
 
 // Controller for updating a developer
-function updateDeveloper(req, res) {
+async function updateDeveloper(req, res) {
     try {
         const developerId = req.params.id;
         
@@ -201,7 +223,7 @@ function updateDeveloper(req, res) {
 
         const attachmentFiles = req.files?.internalAttachments || [];
         if (attachmentFiles.length > 0) {
-            const attachments = moveInternalAttachments(developerId, attachmentFiles, req.user);
+            const attachments = await moveInternalAttachments(developerId, attachmentFiles, req.user);
             if (attachments.length > 0) {
                 const merged = [...(updatedDeveloper.internalAttachments || []), ...attachments];
                 updatedDeveloper = developerData.updateItem(developerId, { internalAttachments: merged }) || updatedDeveloper;
@@ -226,7 +248,7 @@ function deleteDeveloper(req, res) {
 }
 
 // Controller for deleting an attachment
-function deleteAttachment(req, res) {
+async function deleteAttachment(req, res) {
     try {
         const developerId = req.params.id;
         const attachmentId = req.params.attachmentId;
@@ -245,30 +267,17 @@ function deleteAttachment(req, res) {
 
         const attachment = attachments[attachmentIndex];
         
-        // Delete the physical file if it exists
-        if (attachment.url) {
+        // Delete from S3 if it exists
+        if (attachment.s3Key || attachment.url) {
             try {
-                // Extract file path from URL (e.g., /media/attachments/developers/{developerId}/{fileName})
-                // URL format: /media/attachments/developers/{developerId}/{fileName}
-                let urlPath = attachment.url;
-                if (urlPath.startsWith('/media/')) {
-                    urlPath = urlPath.replace('/media/', '');
-                } else if (urlPath.startsWith('media/')) {
-                    urlPath = urlPath.replace('media/', '');
-                } else if (urlPath.startsWith('/')) {
-                    urlPath = urlPath.slice(1);
+                const s3Key = attachment.s3Key || s3Service.extractKeyFromUrl(attachment.url);
+                if (s3Key) {
+                    await s3Service.deleteFromS3(s3Key);
+                    logger.info(`Deleted internal attachment from S3: ${s3Key}`);
                 }
-                const filePath = path.join(MEDIA_ROOT, urlPath);
-                
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                    logger.info(`Deleted attachment file: ${filePath}`);
-                } else {
-                    logger.warn(`Attachment file not found: ${filePath}`);
-                }
-            } catch (fileError) {
-                logger.warn(`Failed to delete attachment file: ${fileError.message}`);
-                // Continue with database deletion even if file deletion fails
+            } catch (s3Error) {
+                logger.warn(`Failed to delete internal attachment from S3: ${attachment.url}`, s3Error);
+                // Continue with database deletion even if S3 deletion fails
             }
         }
 

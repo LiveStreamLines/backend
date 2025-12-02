@@ -6,6 +6,7 @@ const projectData = require("../models/projectData");
 const operationusersData = require('../models/operationusersData');
 const logger = require('../logger');
 const cameraStatusHistoryController = require('./cameraStatusHistoryController');
+const s3Service = require('../utils/s3Service');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
 const MEDIA_ROOT = process.env.MEDIA_PATH || path.join(__dirname, '../media');
@@ -30,41 +31,62 @@ const getUploadedBy = (user) => {
     return user._id || user.id || user.userId || user.email || user.name || 'system';
 };
 
-const moveInternalAttachments = (cameraId, files = [], user) => {
+const moveInternalAttachments = async (cameraId, files = [], user) => {
     if (!files || files.length === 0) {
         return [];
     }
 
-    const attachmentsDir = path.join(CAMERA_ATTACHMENTS_DIR, cameraId);
-    ensureDirectory(attachmentsDir);
-
     const uploadedBy = getUploadedBy(user);
     const attachments = [];
 
-    files.forEach((file) => {
-        const newFileName = `${cameraId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-        const targetPath = path.join(attachmentsDir, newFileName);
+    for (const file of files) {
         try {
-            fs.renameSync(file.path, targetPath);
+            if (!fs.existsSync(file.path)) {
+                logger.warn(`File not found at temp path: ${file.path}`);
+                continue;
+            }
+
+            const newFileName = `${cameraId}_${Date.now()}_${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+            const s3Key = s3Service.getCameraInternalAttachmentKey(cameraId, newFileName);
+
+            // Upload to S3
+            const uploadResult = await s3Service.uploadFileToS3(
+                file.path,
+                s3Key,
+                file.mimetype,
+                file.originalname
+            );
+
+            // Clean up temp file
+            try {
+                fs.unlinkSync(file.path);
+            } catch (unlinkError) {
+                logger.warn('Failed to clean up temp attachment', unlinkError);
+            }
+
             attachments.push({
                 _id: generateAttachmentId(),
                 name: newFileName,
                 originalName: file.originalname,
                 size: file.size,
                 type: file.mimetype,
-                url: `/media/attachments/cameras/${cameraId}/${newFileName}`,
+                url: uploadResult.url,
+                s3Key: s3Key, // Store S3 key for deletion later
                 uploadedAt: new Date().toISOString(),
                 uploadedBy,
             });
         } catch (error) {
-            logger.error('Failed to move internal attachment', error);
+            logger.error('Failed to upload internal attachment to S3', error);
+            // Clean up temp file on error
             try {
-                fs.unlinkSync(file.path);
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
             } catch (unlinkError) {
-                logger.warn('Failed to clean up temp attachment', unlinkError);
+                logger.warn('Failed to clean up temp attachment on error', unlinkError);
             }
         }
-    });
+    }
 
     return attachments;
 };
@@ -245,27 +267,26 @@ function getLastPicturesFromAllCameras(req, res) {
 }
 
 // Controller for adding a new Camera
-function addCamera(req, res) {
+async function addCamera(req, res) {
     try {
         const newCamera = { ...req.body };
         
         // Initialize internal attachments array
         newCamera.internalAttachments = [];
 
+        const addedCamera = cameraData.addItem(newCamera);
+
         // Handle internal attachments if provided
         const attachmentFiles = req.files?.internalAttachments || [];
         if (attachmentFiles.length > 0) {
-            const addedCamera = cameraData.addItem(newCamera);
-            const attachments = moveInternalAttachments(addedCamera._id, attachmentFiles, req.user);
+            const attachments = await moveInternalAttachments(addedCamera._id, attachmentFiles, req.user);
             if (attachments.length > 0) {
                 const response = cameraData.updateItem(addedCamera._id, { internalAttachments: attachments }) || addedCamera;
                 return res.status(201).json(response);
             }
-            return res.status(201).json(addedCamera);
         }
 
-        const addedCamera = cameraData.addItem(newCamera);
-        res.status(201).json(addedCamera);
+        return res.status(201).json(addedCamera);
     } catch (error) {
         logger.error('Error adding camera', error);
         res.status(500).json({ message: 'Failed to add camera', error: error.message });
@@ -273,7 +294,7 @@ function addCamera(req, res) {
 }
 
 // Controller for updating a Camera
-function updateCamera(req, res) {
+async function updateCamera(req, res) {
     try {
         const cameraId = req.params.id;
         const camera = cameraData.getItemById(cameraId);
@@ -290,7 +311,7 @@ function updateCamera(req, res) {
         // Handle internal attachments if provided
         const attachmentFiles = req.files?.internalAttachments || [];
         if (attachmentFiles.length > 0) {
-            const attachments = moveInternalAttachments(cameraId, attachmentFiles, req.user);
+            const attachments = await moveInternalAttachments(cameraId, attachmentFiles, req.user);
             if (attachments.length > 0) {
                 const merged = [...(camera.internalAttachments || []), ...attachments];
                 updatedData.internalAttachments = merged;
@@ -550,7 +571,7 @@ function deleteCamera(req, res) {
     }
 }
 
-function deleteInternalAttachment(req, res) {
+async function deleteInternalAttachment(req, res) {
     try {
         const cameraId = req.params.id;
         const attachmentId = req.params.attachmentId;
@@ -568,15 +589,19 @@ function deleteInternalAttachment(req, res) {
         }
 
         const attachment = attachments[attachmentIndex];
-        const attachmentPath = path.join(MEDIA_ROOT, attachment.url.replace('/media/', ''));
-
-        // Delete file from filesystem
-        try {
-            if (fs.existsSync(attachmentPath)) {
-                fs.unlinkSync(attachmentPath);
+        
+        // Delete from S3 if it exists
+        if (attachment.s3Key || attachment.url) {
+            try {
+                const s3Key = attachment.s3Key || s3Service.extractKeyFromUrl(attachment.url);
+                if (s3Key) {
+                    await s3Service.deleteFromS3(s3Key);
+                    logger.info(`Deleted internal attachment from S3: ${s3Key}`);
+                }
+            } catch (s3Error) {
+                logger.warn(`Failed to delete internal attachment from S3: ${attachment.url}`, s3Error);
+                // Continue with database deletion even if S3 deletion fails
             }
-        } catch (fileError) {
-            logger.warn('Failed to delete attachment file', fileError);
         }
 
         // Remove attachment from array

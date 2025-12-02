@@ -242,6 +242,36 @@ function getContactAttachmentKey(contactId, filename) {
 }
 
 /**
+ * Generate S3 key for developer internal attachments
+ * @param {string} developerId - Developer ID
+ * @param {string} filename - Filename
+ * @returns {string}
+ */
+function getDeveloperInternalAttachmentKey(developerId, filename) {
+    return `attachments/developers/${developerId}/${filename}`;
+}
+
+/**
+ * Generate S3 key for project internal attachments
+ * @param {string} projectId - Project ID
+ * @param {string} filename - Filename
+ * @returns {string}
+ */
+function getProjectInternalAttachmentKey(projectId, filename) {
+    return `attachments/projects/${projectId}/${filename}`;
+}
+
+/**
+ * Generate S3 key for camera internal attachments
+ * @param {string} cameraId - Camera ID
+ * @param {string} filename - Filename
+ * @returns {string}
+ */
+function getCameraInternalAttachmentKey(cameraId, filename) {
+    return `attachments/cameras/${cameraId}/${filename}`;
+}
+
+/**
  * Extract key from S3 URL
  * @param {string} url - S3 URL
  * @returns {string|null}
@@ -271,6 +301,9 @@ module.exports = {
     getTaskAttachmentKey,
     getMaintenanceAttachmentKey,
     getContactAttachmentKey,
+    getDeveloperInternalAttachmentKey,
+    getProjectInternalAttachmentKey,
+    getCameraInternalAttachmentKey,
     extractKeyFromUrl,
     ensureBucketExists,
     BUCKET_NAME,

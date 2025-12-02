@@ -572,7 +572,57 @@ function deleteCamera(req, res) {
     }
 }
 
-// Attachment Controllers
+// Attachment Controllers (matching developer pattern)
+async function deleteAttachment(req, res) {
+    try {
+        const cameraId = req.params.id || req.params.cameraId;
+        const attachmentId = req.params.attachmentId;
+
+        const camera = cameraData.getItemById(cameraId);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        const attachments = camera.internalAttachments || [];
+        const attachmentIndex = attachments.findIndex(att => att._id === attachmentId);
+
+        if (attachmentIndex === -1) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = attachments[attachmentIndex];
+        
+        // Delete from S3 if it exists
+        if (attachment.s3Key || attachment.url) {
+            try {
+                const s3Key = attachment.s3Key || s3Service.extractKeyFromUrl(attachment.url);
+                if (s3Key) {
+                    await s3Service.deleteFromS3(s3Key);
+                    logger.info(`Deleted internal attachment from S3: ${s3Key}`);
+                }
+            } catch (s3Error) {
+                logger.warn(`Failed to delete internal attachment from S3: ${attachment.url}`, s3Error);
+                // Continue with database deletion even if S3 deletion fails
+            }
+        }
+
+        // Remove attachment from array
+        const updatedAttachments = attachments.filter(att => att._id !== attachmentId);
+        const updatedCamera = cameraData.updateItem(cameraId, { 
+            internalAttachments: updatedAttachments 
+        });
+
+        if (updatedCamera) {
+            return res.json(updatedCamera);
+        } else {
+            return res.status(500).json({ message: 'Failed to update camera' });
+        }
+    } catch (error) {
+        logger.error('Error deleting attachment', error);
+        return res.status(500).json({ message: 'Failed to delete attachment' });
+    }
+}
+
 function uploadCameraAttachment(req, res) {
     try {
         const cameraId = req.params.cameraId;
@@ -740,6 +790,7 @@ module.exports = {
     updateCameraInvoicedDuration,
     deleteCamera,
     getMaintenanceCycleStartDate,
+    deleteAttachment,
     uploadCameraAttachment,
     getCameraAttachments,
     deleteCameraAttachment,

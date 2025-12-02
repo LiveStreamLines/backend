@@ -367,43 +367,53 @@ function getProjectAttachments(req, res) {
     }
 }
 
-function deleteProjectAttachment(req, res) {
+async function deleteProjectAttachment(req, res) {
     try {
-        const projectId = req.params.projectId;
+        const projectId = req.params.id || req.params.projectId;
         const attachmentId = req.params.attachmentId;
-        
-        // Check if project exists
+
         const project = projectData.getItemById(projectId);
         if (!project) {
             return res.status(404).json({ message: 'Project not found' });
         }
 
-        if (!project.attachments) {
-            return res.status(404).json({ message: 'No attachments found' });
-        }
+        const attachments = project.internalAttachments || [];
+        const attachmentIndex = attachments.findIndex(att => att._id === attachmentId);
 
-        // Find and remove attachment
-        const attachmentIndex = project.attachments.findIndex(att => att._id === attachmentId);
         if (attachmentIndex === -1) {
             return res.status(404).json({ message: 'Attachment not found' });
         }
 
-        const attachment = project.attachments[attachmentIndex];
+        const attachment = attachments[attachmentIndex];
         
-        // Delete file from filesystem
-        const filePath = path.join(MEDIA_ROOT, 'attachments/projects', projectId, attachment.name);
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+        // Delete from S3 if it exists
+        if (attachment.s3Key || attachment.url) {
+            try {
+                const s3Key = attachment.s3Key || s3Service.extractKeyFromUrl(attachment.url);
+                if (s3Key) {
+                    await s3Service.deleteFromS3(s3Key);
+                    logger.info(`Deleted internal attachment from S3: ${s3Key}`);
+                }
+            } catch (s3Error) {
+                logger.warn(`Failed to delete internal attachment from S3: ${attachment.url}`, s3Error);
+                // Continue with database deletion even if S3 deletion fails
+            }
         }
 
-        // Remove attachment from project
-        project.attachments.splice(attachmentIndex, 1);
-        projectData.updateItem(projectId, { attachments: project.attachments });
+        // Remove attachment from array
+        const updatedAttachments = attachments.filter(att => att._id !== attachmentId);
+        const updatedProject = projectData.updateItem(projectId, { 
+            internalAttachments: updatedAttachments 
+        });
 
-        res.json({ message: 'Attachment deleted successfully' });
+        if (updatedProject) {
+            return res.json(updatedProject);
+        } else {
+            return res.status(500).json({ message: 'Failed to update project' });
+        }
     } catch (error) {
-        logger.error('Error deleting project attachment:', error);
-        res.status(500).json({ message: error.message });
+        logger.error('Error deleting attachment', error);
+        return res.status(500).json({ message: 'Failed to delete attachment' });
     }
 }
 

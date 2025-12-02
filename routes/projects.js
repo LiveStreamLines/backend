@@ -91,10 +91,11 @@ router.post('/', uploadFields, projectController.addProject);
 router.put('/:id', uploadFields, projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
 
-// Attachment routes
+// Attachment routes (matching developer pattern - deletes from internalAttachments)
+router.delete('/:id/attachments/:attachmentId', projectController.deleteProjectAttachment);
+// Legacy routes for regular attachments (if still needed)
 router.post('/:projectId/attachments', attachmentUpload.single('file'), projectController.uploadProjectAttachment);
 router.get('/:projectId/attachments', projectController.getProjectAttachments);
-router.delete('/:projectId/attachments/:attachmentId', projectController.deleteProjectAttachment);
 
 // Internal attachment routes
 router.delete('/:id/internal-attachments/:attachmentId', projectController.deleteInternalAttachment);

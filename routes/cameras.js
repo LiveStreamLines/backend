@@ -83,7 +83,10 @@ router.put('/:id/invoice', cameraController.updateCameraInvoiceInfo);
 router.put('/:id/invoiced-duration', cameraController.updateCameraInvoicedDuration);
 router.delete('/:id', cameraController.deleteCamera);
 
-// Attachment routes
+// Attachment routes (matching developer pattern - deletes from internalAttachments)
+router.delete('/:id/attachments/:attachmentId', cameraController.deleteAttachment);
+
+// Legacy routes for regular attachments (if still needed)
 router.post('/:cameraId/attachments', attachmentUpload.single('file'), cameraController.uploadCameraAttachment);
 router.get('/:cameraId/attachments', cameraController.getCameraAttachments);
 router.delete('/:cameraId/attachments/:attachmentId', cameraController.deleteCameraAttachment);

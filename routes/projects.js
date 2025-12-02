@@ -20,18 +20,18 @@ const ensureDir = (dirPath) => {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === 'logo') {
-      const logoDir = path.join(process.env.MEDIA_PATH, 'logos/project');
+      const logoDir = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'logos/project');
       ensureDir(logoDir);
       cb(null, logoDir);
       return;
     }
     if (file.fieldname === 'internalAttachments') {
-      const tempDir = path.join(process.env.MEDIA_PATH, 'attachments/projects/temp');
+      const tempDir = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'attachments/projects/temp');
       ensureDir(tempDir);
       cb(null, tempDir);
       return;
     }
-    const fallbackDir = path.join(process.env.MEDIA_PATH, 'uploads/tmp');
+    const fallbackDir = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'uploads/tmp');
     ensureDir(fallbackDir);
     cb(null, fallbackDir);
   },
@@ -52,7 +52,7 @@ const storage = multer.diskStorage({
 const attachmentStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         const projectId = req.params.projectId;
-        const uploadPath = path.join(process.env.MEDIA_PATH, 'attachments/projects', projectId);
+        const uploadPath = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'attachments/projects', projectId);
         
         // Create directory if it doesn't exist
         if (!fs.existsSync(uploadPath)) {

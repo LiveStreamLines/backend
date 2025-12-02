@@ -36,10 +36,37 @@ const storage = multer.diskStorage({
   },
 });
 
+// Configure multer for attachment uploads
+const attachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const cameraId = req.params.cameraId;
+        const uploadPath = path.join(process.env.MEDIA_PATH || path.join(__dirname, '../media'), 'attachments/cameras', cameraId);
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const timestamp = Date.now();
+        const ext = path.extname(file.originalname);
+        const name = path.basename(file.originalname, ext);
+        cb(null, `${name}_${timestamp}${ext}`);
+    }
+});
+
 const upload = multer({ storage });
 const uploadFields = upload.fields([
   { name: 'internalAttachments', maxCount: 10 },
 ]);
+const attachmentUpload = multer({ 
+    storage: attachmentStorage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
 
 router.get('/', cameraController.getAllCameras);
 router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
@@ -55,6 +82,13 @@ router.put('/:id/install', cameraController.updateCameraInstallationDate);
 router.put('/:id/invoice', cameraController.updateCameraInvoiceInfo);
 router.put('/:id/invoiced-duration', cameraController.updateCameraInvoicedDuration);
 router.delete('/:id', cameraController.deleteCamera);
+
+// Attachment routes
+router.post('/:cameraId/attachments', attachmentUpload.single('file'), cameraController.uploadCameraAttachment);
+router.get('/:cameraId/attachments', cameraController.getCameraAttachments);
+router.delete('/:cameraId/attachments/:attachmentId', cameraController.deleteCameraAttachment);
+
+// Internal attachment routes
 router.delete('/:id/internal-attachments/:attachmentId', cameraController.deleteInternalAttachment);
 
 module.exports = router;

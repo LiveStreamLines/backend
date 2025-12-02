@@ -176,7 +176,7 @@ async function addProject(req, res) {
         const logoFile = req.files?.logo?.[0];
         if (logoFile) {
             const logoFileName = `${addedProject._id}${path.extname(logoFile.originalname)}`;
-            const logoFilePath = path.join(process.env.MEDIA_PATH, 'logos/project/', logoFileName);
+            const logoFilePath = path.join(MEDIA_ROOT, 'logos/project/', logoFileName);
             fs.renameSync(logoFile.path, logoFilePath);
             response = projectData.updateItem(addedProject._id, { logo: `logos/project/${logoFileName}` }) || response;
         } else {
@@ -225,7 +225,7 @@ async function updateProject(req, res) {
         const logoFile = req.files?.logo?.[0];
         if (logoFile) {
             const logoFileName = `${projectId}${path.extname(logoFile.originalname)}`;
-            const logoFilePath = path.join(process.env.MEDIA_PATH, 'logos/project/', logoFileName);
+            const logoFilePath = path.join(MEDIA_ROOT, 'logos/project/', logoFileName);
             fs.renameSync(logoFile.path, logoFilePath);
             updatedProject = projectData.updateItem(projectId, { logo: `logos/project/${logoFileName}` }) || updatedProject;
         }
@@ -391,7 +391,7 @@ function deleteProjectAttachment(req, res) {
         const attachment = project.attachments[attachmentIndex];
         
         // Delete file from filesystem
-        const filePath = path.join(process.env.MEDIA_PATH, 'attachments/projects', projectId, attachment.name);
+        const filePath = path.join(MEDIA_ROOT, 'attachments/projects', projectId, attachment.name);
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }

@@ -7,6 +7,7 @@ const operationusersData = require('../models/operationusersData');
 const logger = require('../logger');
 const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 const s3Service = require('../utils/s3Service');
+const DataModel = require('../models/DataModel');
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
 const MEDIA_ROOT = process.env.MEDIA_PATH || path.join(__dirname, '../media');
@@ -571,6 +572,109 @@ function deleteCamera(req, res) {
     }
 }
 
+// Attachment Controllers
+function uploadCameraAttachment(req, res) {
+    try {
+        const cameraId = req.params.cameraId;
+        const file = req.file;
+        
+        if (!file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        // Check if camera exists
+        const camera = cameraData.getItemById(cameraId);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        // Create attachment object
+        const dataModel = new DataModel('temp');
+        const attachment = {
+            _id: dataModel.generateCustomId(),
+            name: file.filename,
+            originalName: file.originalname,
+            size: file.size,
+            type: file.mimetype,
+            url: `/backend/media/attachments/cameras/${cameraId}/${file.filename}`,
+            uploadedAt: new Date().toISOString(),
+            uploadedBy: req.user?.id || 'system'
+        };
+
+        // Add attachment to camera
+        if (!camera.attachments) {
+            camera.attachments = [];
+        }
+        camera.attachments.push(attachment);
+
+        // Update camera in database
+        cameraData.updateItem(cameraId, { attachments: camera.attachments });
+
+        res.status(201).json(attachment);
+    } catch (error) {
+        logger.error('Error uploading camera attachment:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+function getCameraAttachments(req, res) {
+    try {
+        const cameraId = req.params.cameraId;
+        
+        // Check if camera exists
+        const camera = cameraData.getItemById(cameraId);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        const attachments = camera.attachments || [];
+        res.json(attachments);
+    } catch (error) {
+        logger.error('Error getting camera attachments:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+function deleteCameraAttachment(req, res) {
+    try {
+        const cameraId = req.params.cameraId;
+        const attachmentId = req.params.attachmentId;
+        
+        // Check if camera exists
+        const camera = cameraData.getItemById(cameraId);
+        if (!camera) {
+            return res.status(404).json({ message: 'Camera not found' });
+        }
+
+        if (!camera.attachments) {
+            return res.status(404).json({ message: 'No attachments found' });
+        }
+
+        // Find and remove attachment
+        const attachmentIndex = camera.attachments.findIndex(att => att._id === attachmentId);
+        if (attachmentIndex === -1) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = camera.attachments[attachmentIndex];
+        
+        // Delete file from filesystem
+        const filePath = path.join(MEDIA_ROOT, 'attachments/cameras', cameraId, attachment.name);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        // Remove attachment from camera
+        camera.attachments.splice(attachmentIndex, 1);
+        cameraData.updateItem(cameraId, { attachments: camera.attachments });
+
+        res.json({ message: 'Attachment deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting camera attachment:', error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 async function deleteInternalAttachment(req, res) {
     try {
         const cameraId = req.params.id;
@@ -636,5 +740,8 @@ module.exports = {
     updateCameraInvoicedDuration,
     deleteCamera,
     getMaintenanceCycleStartDate,
+    uploadCameraAttachment,
+    getCameraAttachments,
+    deleteCameraAttachment,
     deleteInternalAttachment
 };

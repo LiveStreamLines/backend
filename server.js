@@ -33,6 +33,7 @@ const contactRoutes = require('./routes/contacts');
 const taskRoutes = require('./routes/tasks');
 const operationusersRoutes = require('./routes/operationusers');
 const attachmentRoutes = require('./routes/attachments');
+const serviceConfigRoutes = require('./routes/serviceConfig');
 
 
 
@@ -82,6 +83,7 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/operationusers', operationusersRoutes);
 app.use('/api/attachments', attachmentRoutes);
+app.use('/api/service-config', serviceConfigRoutes);
 
 
 

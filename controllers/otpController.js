@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const twilio = require('twilio');
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const operationusersData = require('../models/operationusersData');
-const usersData = require('../models/usersData');
+const usersData = require('../models/userData');
 const logger = require('../logger');
 
 // Generate and Send OTP

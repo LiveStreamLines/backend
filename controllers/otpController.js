@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const twilio = require('twilio');
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const operationusersData = require('../models/operationusersData');
+const usersData = require('../models/usersData');
 const logger = require('../logger');
 
 // Generate and Send OTP
@@ -12,7 +13,13 @@ exports.sendOtp = (req, res) => {
     return res.status(400).json({ error: 'Phone number is required' });
   }
 
-  const user = operationusersData.findUserByPhone(phone);
+  // Validate Twilio Service SID is configured
+  if (!process.env.TWILIO_SERVICE_SID) {
+    logger.error('TWILIO_SERVICE_SID environment variable is not set');
+    return res.status(500).json({ error: 'Twilio service configuration is missing' });
+  }
+
+  const user = usersData.findUserByPhone(phone);
 
   if (user && !user.isActive) {
       return res.status(403).json({ msg: 'User account is inactive' });
@@ -25,7 +32,20 @@ exports.sendOtp = (req, res) => {
     })
     .catch((err) => {
       logger.error('Error sending OTP:', err);
-      res.status(500).json({ error: 'Failed to send OTP' });
+      
+      // Provide more specific error messages
+      if (err.code === 20404) {
+        return res.status(404).json({ 
+          error: 'Twilio Verify Service not found. Please check your TWILIO_SERVICE_SID environment variable.',
+          details: `Service SID: ${process.env.TWILIO_SERVICE_SID}`,
+          message: 'The Twilio Verify Service does not exist or has been deleted. Please verify the service SID in your Twilio console.'
+        });
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to send OTP',
+        message: err.message || 'An unknown error occurred'
+      });
     });
 }
 
@@ -37,6 +57,12 @@ exports.verifyOtp = (req, res) => {
     return res.status(400).json({ error: 'Phone and OTP are required' });
   }
 
+  // Validate Twilio Service SID is configured
+  if (!process.env.TWILIO_SERVICE_SID) {
+    logger.error('TWILIO_SERVICE_SID environment variable is not set');
+    return res.status(500).json({ error: 'Twilio service configuration is missing' });
+  }
+
   client.verify.v2.services(process.env.TWILIO_SERVICE_SID)
     .verificationChecks.create({ to: phone, code: otp })
     .then((verificationCheck) => {
@@ -44,15 +70,15 @@ exports.verifyOtp = (req, res) => {
         let user;
         if (userId) {
             // If userId is provided, associate the phone with the user
-            user = operationusersData.getItemById(userId);
+            user = usersData.getItemById(userId);
             if (user) {
                 user.phone = phone; // Associate the phone number
                 user.status = "active";
-                operationusersData.updateItem(userId, user); // Save updated user data
+                usersData.updateItem(userId, user); // Save updated user data
             }
         } else {
             // For phone login, find user by phone
-            user = operationusersData.findUserByPhone(phone);
+            user = usersData.findUserByPhone(phone);
         }
 
         if (!user) {
@@ -77,7 +103,7 @@ exports.verifyOtp = (req, res) => {
           // const services = user.accessibleServices || [];
 
           const logintime = new Date().toISOString();
-          const updatedUser = operationusersData.updateItem(user._id, {"LastLoginTime":logintime});
+          const updatedUser = usersData.updateItem(user._id, {"LastLoginTime":logintime});
           
 
           return res.json({ 
@@ -105,6 +131,19 @@ exports.verifyOtp = (req, res) => {
     })
     .catch((err) => {
       logger.error('Error verifying OTP:', err);
-      res.status(500).json({ error: 'Failed to verify OTP' });
+      
+      // Provide more specific error messages
+      if (err.code === 20404) {
+        return res.status(404).json({ 
+          error: 'Twilio Verify Service not found. Please check your TWILIO_SERVICE_SID environment variable.',
+          details: `Service SID: ${process.env.TWILIO_SERVICE_SID}`,
+          message: 'The Twilio Verify Service does not exist or has been deleted. Please verify the service SID in your Twilio console.'
+        });
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to verify OTP',
+        message: err.message || 'An unknown error occurred'
+      });
     });
 };

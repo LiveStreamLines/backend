@@ -36,6 +36,7 @@ const operationusersRoutes = require('./routes/operationusers');
 const attachmentRoutes = require('./routes/attachments');
 const serviceConfigRoutes = require('./routes/serviceConfig');
 const liveCameraRoutes = require('./routes/liveCamera');
+const syncRoutes = require('./routes/sync');
 
 
 
@@ -88,6 +89,7 @@ app.use('/api/operationusers', operationusersRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/service-config', serviceConfigRoutes);
 app.use('/api/live-camera', liveCameraRoutes);
+app.use('/api/sync', syncRoutes);
 
 
 

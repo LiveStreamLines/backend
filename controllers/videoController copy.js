@@ -37,7 +37,7 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
 
   // Check if the camera directory exists
   if (!fs.existsSync(PicsPath)) {
-    throw new Error('Camera directory not found');
+    return res.status(404).json({ error: 'Camera directory not found' });
   }
 
   // Read all image files in the camera directory
@@ -53,7 +53,7 @@ function filterImage({ developerId, projectId, cameraId, date1, date2, hour1, ho
   const numFilteredPics = filteredFiles.length;
 
   if (numFilteredPics === 0) {
-    throw new Error('No pictures found for the specified date and hour range');
+    return res.status(404).json({ error: 'No pictures found for the specified date and hour range' });
   }
 
    // Create a text file with paths to the filtered images
@@ -115,8 +115,6 @@ function generateVideoRequest(req, res) {
       music, musicFile,
       contrast, brightness, saturation,
       status: 'queued',
-      progress: 0,
-      progressMessage: 'Waiting in queue...',
       userId: userId,
       userName: userName
     };
@@ -214,11 +212,7 @@ function processVideoRequest(queuedRequest) {
   // Update the status to starting
   logger.info(`Starting video generation for request ID: ${queuedRequest._id}`);
   queuedRequest.status = 'starting';
-  videoRequestData.updateItem(queuedRequest._id, { 
-    status: 'starting',
-    progress: 0,
-    progressMessage: 'Initializing video generation...'
-  });
+  videoRequestData.updateItem(queuedRequest._id, { status: 'starting' });
 
   processing = true; // Mark as processing
 
@@ -243,21 +237,15 @@ function processVideoRequest(queuedRequest) {
     contrast, brightness, saturation
   };
 
-  processVideoInChunks(requestPayload, queuedRequest._id, (error, videoDetails) => {
+  processVideoInChunks(requestPayload, (error, videoDetails) => {
     if (error) {
       logger.error(`Video generation failed for request ID: ${requestId}`);
-      videoRequestData.updateItem(queuedRequest._id, { 
-        status: 'failed',
-        progress: 0,
-        progressMessage: 'Video generation failed'
-      });
+      videoRequestData.updateItem(queuedRequest._id, { status: 'failed' });
     } else {
       logger.info(`Video generation completed for request ID: ${requestId}`);
        // Update the request with additional video details
        videoRequestData.updateItem(queuedRequest._id, {
         status: 'ready',
-        progress: 100,
-        progressMessage: 'Video generation completed',
         videoPath: videoDetails.videoPath,
         videoLength: videoDetails.videoLength,
         fileSize: videoDetails.fileSize,
@@ -272,15 +260,15 @@ function processVideoRequest(queuedRequest) {
 
 }
 
-function processVideoInChunks(payload, requestId, callback) {
-  const { developerId, projectId, cameraId, requestId: requestIdFromPayload, frameRate, 
+function processVideoInChunks(payload, callback) {
+  const { developerId, projectId, cameraId, requestId, frameRate, 
     resolution, showdate, showedText, showedWatermark, logo, music, musicFile,
     contrast, brightness, saturation,
   } = payload;
 
   const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'videos');
-  const outputVideoPath = path.join(cameraPath, `video_${requestIdFromPayload}.mp4`);
-  const listFilePath = path.join(cameraPath, `image_list_${requestIdFromPayload}.txt`);
+  const outputVideoPath = path.join(cameraPath, `video_${requestId}.mp4`);
+  const listFilePath = path.join(cameraPath, `image_list_${requestId}.txt`);
   const partialVideos = [];
 
   // Read `filteredFiles` dynamically from the text file
@@ -295,16 +283,6 @@ function processVideoInChunks(payload, requestId, callback) {
     .filter(Boolean);
 
   const batchCount = Math.ceil(filteredFiles.length / batchSize);
-  
-  // Update progress: Processing batches (0-80% of total progress)
-  const updateBatchProgress = (batchIndex) => {
-    const batchProgress = Math.floor((batchIndex / batchCount) * 80); // 80% for batch processing
-    videoRequestData.updateItem(requestId, {
-      status: 'processing',
-      progress: batchProgress,
-      progressMessage: `Processing batch ${batchIndex + 1} of ${batchCount} (${filteredFiles.length} images)`
-    });
-  };
 
   const processBatch = (batchIndex) => {
     
@@ -316,12 +294,7 @@ function processVideoInChunks(payload, requestId, callback) {
       if (showedWatermark) {
         fs.unlinkSync(showedWatermark);
       }
-      // Update progress: Starting concatenation (80%)
-      videoRequestData.updateItem(requestId, {
-        progress: 80,
-        progressMessage: 'Concatenating video segments...'
-      });
-      concatenateVideos(partialVideos, outputVideoPath, music, musicFile, contrast, brightness, saturation, requestId, callback);
+      concatenateVideos(partialVideos, outputVideoPath, music, musicFile, contrast, brightness, saturation, callback);
       return;
     }
 
@@ -417,14 +390,10 @@ function processVideoInChunks(payload, requestId, callback) {
         '-pix_fmt yuv420p',
       ])
       .output(batchVideoPathl)
-      .on('start', command => {
-        logger.info(`FFmpeg Command for batch ${batchIndex}:${command}`);
-        updateBatchProgress(batchIndex);
-      })
+      .on('start', command => logger.info(`FFmpeg Command for batch ${batchIndex}:${command}`))
       .on('end', () => {
         logger.info(`Processed batch ${batchIndex + 1}/${batchCount}`);
         fs.unlinkSync(batchListPathl);
-        updateBatchProgress(batchIndex + 1);
         processBatch(batchIndex + 1);
       })
       .on('error', err => {
@@ -438,7 +407,7 @@ function processVideoInChunks(payload, requestId, callback) {
 }
 
 
-function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, musicFile, contrast, brightness, saturation, requestId, callback) {
+function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, musicFile, contrast, brightness, saturation, callback) {
   const concatListPath = path.join(path.dirname(outputVideoPath), `concat_list.txt`);
   const tempConcatenatedVideoPath = outputVideoPath.replace('.mp4', '_no_audio.mp4');
   const concatContent = videoPaths.map(video => `file '${video}'`).join('\n');
@@ -453,12 +422,6 @@ function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, musi
     .on('end', () => {
       videoPaths.forEach(video => fs.unlinkSync(video)); // Clean up partial videos
       fs.unlinkSync(concatListPath); // Remove temporary list file
-
-      // Update progress: Applying effects (85%)
-      videoRequestData.updateItem(requestId, {
-        progress: 85,
-        progressMessage: 'Applying visual effects and audio...'
-      });
 
       // Step 2: Add visual effects and background music (if applicable)
       const backgroundMusicPath = path
@@ -491,16 +454,6 @@ function concatenateVideos(videoPaths, outputVideoPath, useBackgroundMusic, musi
         .output(outputVideoPath)
         .on('start', command => {
           logger.info('FFmpeg command:', command); // Log command for debugging
-        })
-        .on('progress', (progress) => {
-          // Update progress during final encoding (85-95%)
-          if (progress.percent) {
-            const finalProgress = 85 + Math.floor((progress.percent / 100) * 10);
-            videoRequestData.updateItem(requestId, {
-              progress: Math.min(finalProgress, 95),
-              progressMessage: 'Finalizing video...'
-            });
-          }
         })
         .on('end', () => {
           fs.unlinkSync(tempConcatenatedVideoPath); // Clean up temporary video file

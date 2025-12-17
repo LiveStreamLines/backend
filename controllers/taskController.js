@@ -8,6 +8,19 @@ const s3Service = require('../utils/s3Service');
 
 const generateAttachmentId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
+const TASK_CATEGORIES = ['operation', 'finance', 'media', 'other'];
+
+const normalizeTaskType = (type) => {
+    const normalized = (type || '').toString().trim().toLowerCase();
+    if (!normalized) {
+        return null;
+    }
+    if (TASK_CATEGORIES.includes(normalized)) {
+        return normalized;
+    }
+    return null;
+};
+
 const getUploadedBy = (user) => {
     if (!user) {
         return 'system';
@@ -99,6 +112,7 @@ function getAllTasks(req, res) {
     try {
         const { status, assignee, assigned, approver, type } = req.query;
         let tasks = taskData.getAllItems();
+        const normalizedType = type ? normalizeTaskType(type) : null;
 
         // Apply filters
         if (status) {
@@ -114,7 +128,10 @@ function getAllTasks(req, res) {
             tasks = tasks.filter(task => task.approver === approver);
         }
         if (type) {
-            tasks = tasks.filter(task => task.type === type);
+            if (!normalizedType) {
+                return res.status(400).json({ message: 'Invalid task type' });
+            }
+            tasks = tasks.filter(task => normalizeTaskType(task.type) === normalizedType);
         }
 
         res.json(tasks);
@@ -148,12 +165,13 @@ async function createTask(req, res) {
         }
 
         const { title, description, type, assignee, approver, notes } = req.body;
+        const normalizedType = normalizeTaskType(type);
 
         // Validation
         if (!title || !title.trim()) {
             return res.status(400).json({ message: 'Task title is required' });
         }
-        if (!type || !type.trim()) {
+        if (!normalizedType) {
             return res.status(400).json({ message: 'Task type is required' });
         }
         if (!assignee || !assignee.trim()) {
@@ -169,7 +187,7 @@ async function createTask(req, res) {
         const taskPayload = {
             title: title.trim(),
             description: description || '',
-            type: type.trim(),
+            type: normalizedType,
             assignee: assignee.trim(),
             assigneeName: assigneeUser?.name || '',
             assigned: userId,
@@ -229,6 +247,7 @@ async function updateTask(req, res) {
         }
 
         const { title, description, type, assignee, approver, status } = req.body;
+        const normalizedType = type !== undefined ? normalizeTaskType(type) : undefined;
 
         const updateData = {
             updatedDate: new Date().toISOString(),
@@ -236,7 +255,12 @@ async function updateTask(req, res) {
 
         if (title !== undefined) updateData.title = title.trim();
         if (description !== undefined) updateData.description = description || '';
-        if (type !== undefined) updateData.type = type.trim();
+        if (type !== undefined) {
+            if (!normalizedType) {
+                return res.status(400).json({ message: 'Invalid task type' });
+            }
+            updateData.type = normalizedType;
+        }
         if (status !== undefined) updateData.status = status;
 
         // Update assignee if provided

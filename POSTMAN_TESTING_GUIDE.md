@@ -62,7 +62,7 @@ Before testing attachments, you need to authenticate first.
   - `description`: `Testing S3 upload functionality`
   - `type`: `Bug`
   - `assignee`: `assignee_user_id`
-  - `approver`: `approver_user_id` (optional)
+  - `concernedUsers`: JSON array string of user IDs (optional), e.g. `["userId1","userId2"]`
   - `notes`: `Initial note` (optional)
   - `attachments`: (Select "File" type) - Choose your test file(s)
 

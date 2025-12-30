@@ -12,6 +12,13 @@ router.use(authMiddleware);
 router.post('/:developerId/:projectId/:cameraId/pictures/', cameraPicsControllerS3Test.getCameraPictures);
 router.get('/preview/:developerId/:projectId/:cameraId/', cameraPicsControllerS3Test.getCameraPreview);
 router.get('/preview-video/:developerId/:projectId/:cameraId/', cameraPicsControllerS3Test.generateWeeklyVideo);
+// Route to get presigned URL for an image
+router.get('/image/:developerId/:projectId/:cameraId/:imageTimestamp', cameraPicsControllerS3Test.getImagePresignedUrl);
+// Slideshow routes
+router.get('/slideshow/30days/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getSlideshow30Days);
+router.get('/slideshow/quarter/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getSlideshowQuarter);
+router.get('/slideshow/6months/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getSlideshow6Months);
+router.get('/slideshow/1year/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getSlideshow1Year);
 
 module.exports = router;
 

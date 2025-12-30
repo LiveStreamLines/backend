@@ -8,19 +8,6 @@ const s3Service = require('../utils/s3Service');
 
 const generateAttachmentId = () => Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
-const TASK_CATEGORIES = ['operation', 'finance', 'media', 'other'];
-
-const normalizeTaskType = (type) => {
-    const normalized = (type || '').toString().trim().toLowerCase();
-    if (!normalized) {
-        return null;
-    }
-    if (TASK_CATEGORIES.includes(normalized)) {
-        return normalized;
-    }
-    return null;
-};
-
 const getUploadedBy = (user) => {
     if (!user) {
         return 'system';
@@ -110,9 +97,8 @@ const getUserId = (req) => {
 // Get all tasks
 function getAllTasks(req, res) {
     try {
-        const { status, assignee, assigned, type } = req.query;
+        const { status, assignee, assigned, approver, type } = req.query;
         let tasks = taskData.getAllItems();
-        const normalizedType = type ? normalizeTaskType(type) : null;
 
         // Apply filters
         if (status) {
@@ -124,11 +110,11 @@ function getAllTasks(req, res) {
         if (assigned) {
             tasks = tasks.filter(task => task.assigned === assigned);
         }
+        if (approver) {
+            tasks = tasks.filter(task => task.approver === approver);
+        }
         if (type) {
-            if (!normalizedType) {
-                return res.status(400).json({ message: 'Invalid task type' });
-            }
-            tasks = tasks.filter(task => normalizeTaskType(task.type) === normalizedType);
+            tasks = tasks.filter(task => task.type === type);
         }
 
         res.json(tasks);
@@ -161,14 +147,13 @@ async function createTask(req, res) {
             return res.status(401).json({ message: 'User not authenticated' });
         }
 
-        const { title, description, type, assignee, notes, concernedUsers } = req.body;
-        const normalizedType = normalizeTaskType(type);
+        const { title, description, type, assignee, approver, notes } = req.body;
 
         // Validation
         if (!title || !title.trim()) {
             return res.status(400).json({ message: 'Task title is required' });
         }
-        if (!normalizedType) {
+        if (!type || !type.trim()) {
             return res.status(400).json({ message: 'Task type is required' });
         }
         if (!assignee || !assignee.trim()) {
@@ -179,38 +164,18 @@ async function createTask(req, res) {
         const users = operationusersData.getAllItems();
         const assignedUser = users.find(u => u._id === userId);
         const assigneeUser = users.find(u => u._id === assignee);
-
-        // Parse concerned users (JSON array string from FormData)
-        let concernedUserIds = [];
-        if (typeof concernedUsers === 'string' && concernedUsers.trim()) {
-            try {
-                const parsed = JSON.parse(concernedUsers);
-                if (Array.isArray(parsed)) {
-                    concernedUserIds = parsed;
-                } else {
-                    concernedUserIds = [concernedUsers];
-                }
-            } catch (e) {
-                // Fallback: comma-separated
-                concernedUserIds = concernedUsers.split(',').map((v) => v.trim()).filter(Boolean);
-            }
-        } else if (Array.isArray(concernedUsers)) {
-            concernedUserIds = concernedUsers;
-        }
-
-        concernedUserIds = Array.from(new Set(concernedUserIds.map((id) => (id || '').toString().trim()).filter(Boolean)));
-        const concernedNames = concernedUserIds.map((id) => users.find((u) => u._id === id)?.name || 'Unknown');
+        const approverUser = approver ? users.find(u => u._id === approver) : null;
 
         const taskPayload = {
             title: title.trim(),
             description: description || '',
-            type: normalizedType,
+            type: type.trim(),
             assignee: assignee.trim(),
             assigneeName: assigneeUser?.name || '',
             assigned: userId,
             assignedName: assignedUser?.name || '',
-            concernedUsers: concernedUserIds,
-            concernedNames,
+            approver: approver && approver.trim() ? approver.trim() : null,
+            approverName: approverUser?.name || null,
             status: 'open',
             attachments: [],
             notes: [],
@@ -263,8 +228,7 @@ async function updateTask(req, res) {
             return res.status(404).json({ message: 'Task not found' });
         }
 
-        const { title, description, type, assignee, status, concernedUsers } = req.body;
-        const normalizedType = type !== undefined ? normalizeTaskType(type) : undefined;
+        const { title, description, type, assignee, approver, status } = req.body;
 
         const updateData = {
             updatedDate: new Date().toISOString(),
@@ -272,12 +236,7 @@ async function updateTask(req, res) {
 
         if (title !== undefined) updateData.title = title.trim();
         if (description !== undefined) updateData.description = description || '';
-        if (type !== undefined) {
-            if (!normalizedType) {
-                return res.status(400).json({ message: 'Invalid task type' });
-            }
-            updateData.type = normalizedType;
-        }
+        if (type !== undefined) updateData.type = type.trim();
         if (status !== undefined) updateData.status = status;
 
         // Update assignee if provided
@@ -288,24 +247,17 @@ async function updateTask(req, res) {
             updateData.assigneeName = assigneeUser?.name || '';
         }
 
-        // Update concerned users if provided
-        if (concernedUsers !== undefined) {
-            const users = operationusersData.getAllItems();
-            let concernedUserIds = [];
-            if (typeof concernedUsers === 'string' && concernedUsers.trim()) {
-                try {
-                    const parsed = JSON.parse(concernedUsers);
-                    concernedUserIds = Array.isArray(parsed) ? parsed : [concernedUsers];
-                } catch (e) {
-                    concernedUserIds = concernedUsers.split(',').map((v) => v.trim()).filter(Boolean);
-                }
-            } else if (Array.isArray(concernedUsers)) {
-                concernedUserIds = concernedUsers;
+        // Update approver if provided
+        if (approver !== undefined) {
+            if (approver && approver.trim()) {
+                const users = operationusersData.getAllItems();
+                const approverUser = users.find(u => u._id === approver);
+                updateData.approver = approver.trim();
+                updateData.approverName = approverUser?.name || '';
+            } else {
+                updateData.approver = null;
+                updateData.approverName = null;
             }
-
-            concernedUserIds = Array.from(new Set(concernedUserIds.map((id) => (id || '').toString().trim()).filter(Boolean)));
-            updateData.concernedUsers = concernedUserIds;
-            updateData.concernedNames = concernedUserIds.map((id) => users.find((u) => u._id === id)?.name || 'Unknown');
         }
 
         // Handle attachments (for initial task attachments)
@@ -350,15 +302,15 @@ async function addNote(req, res) {
             return res.status(400).json({ message: 'Note content is required' });
         }
 
-        // Verify user has permission (assignee, assigned, or concerned people)
+        // Verify user has permission (assignee, assigned, or approver)
         const users = operationusersData.getAllItems();
         const user = users.find(u => u._id === userId);
         
         const isAssignee = task.assignee === userId;
         const isAssigned = task.assigned === userId;
-        const isConcerned = Array.isArray(task.concernedUsers) && task.concernedUsers.includes(userId);
+        const isApprover = task.approver === userId;
 
-        if (!isAssignee && !isAssigned && !isConcerned) {
+        if (!isAssignee && !isAssigned && !isApprover) {
             return res.status(403).json({ message: 'You do not have permission to add notes to this task' });
         }
 
@@ -409,12 +361,12 @@ function closeTask(req, res) {
             return res.status(401).json({ message: 'User not authenticated' });
         }
 
-        // Verify user has permission (assignee or concerned people)
+        // Verify user has permission (assignee or approver)
         const isAssignee = task.assignee === userId;
-        const isConcerned = Array.isArray(task.concernedUsers) && task.concernedUsers.includes(userId);
+        const isApprover = task.approver === userId;
 
-        if (!isAssignee && !isConcerned) {
-            return res.status(403).json({ message: 'Only assignee or concerned people can close this task' });
+        if (!isAssignee && !isApprover) {
+            return res.status(403).json({ message: 'Only assignee or approver can close this task' });
         }
 
         const updatedTask = taskData.updateItem(taskId, {

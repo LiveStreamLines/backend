@@ -322,10 +322,271 @@ async function getEmaarPics(req, res) {
     }
 }
 
+/**
+ * Get presigned URL for a camera image
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ */
+async function getImagePresignedUrl(req, res) {
+    try {
+        const { developerId, projectId, cameraId, imageTimestamp } = req.params;
+
+        // Validate image timestamp format (YYYYMMDDHHMMSS)
+        const timestampRegex = /^\d{14}$/;
+        if (!timestampRegex.test(imageTimestamp)) {
+            return res.status(400).json({ 
+                error: 'Invalid image timestamp format. Use YYYYMMDDHHMMSS format (e.g., 20240114143000)' 
+            });
+        }
+
+        // Construct the S3 key
+        const s3Key = `upload/${developerId}/${projectId}/${cameraId}/large/${imageTimestamp}.jpg`;
+
+        // Generate presigned URL
+        const presignedUrl = await getPresignedUrl(s3Key);
+
+        res.json({
+            url: presignedUrl,
+            key: s3Key,
+            expiresIn: PRESIGNED_URL_EXPIRY
+        });
+    } catch (error) {
+        logger.error('Error in getImagePresignedUrl (S3):', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get images for slideshow based on time range
+ * @param {string} s3Prefix - S3 prefix path
+ * @param {string} rangeType - '30days', 'quarter', '6months', '1year'
+ * @returns {Promise<string[]>} Array of image filenames (without extension)
+ */
+async function getSlideshowImages(s3Prefix, rangeType) {
+    const objectKeys = await listS3Objects(s3Prefix);
+    const jpgKeys = objectKeys.filter(key => key.endsWith('.jpg'));
+
+    if (jpgKeys.length === 0) {
+        throw new Error('No pictures found in camera directory');
+    }
+
+    // Extract filenames and sort
+    const files = jpgKeys.map(key => extractFilename(key));
+    const sortedFiles = files.sort();
+
+    // Get the actual date range from available images
+    const firstFile = sortedFiles[0];
+    const lastFile = sortedFiles[sortedFiles.length - 1];
+    
+    // Extract dates from first and last files (YYYYMMDD format)
+    const firstDateStr = firstFile.slice(0, 8);
+    const lastDateStr = lastFile.slice(0, 8);
+    
+    // Parse dates
+    const firstDate = new Date(
+        parseInt(firstDateStr.slice(0, 4)),
+        parseInt(firstDateStr.slice(4, 6)) - 1,
+        parseInt(firstDateStr.slice(6, 8))
+    );
+    
+    const lastDate = new Date(
+        parseInt(lastDateStr.slice(0, 4)),
+        parseInt(lastDateStr.slice(4, 6)) - 1,
+        parseInt(lastDateStr.slice(6, 8))
+    );
+
+    // Use the last available date as "now" for calculation
+    const now = new Date(lastDate);
+    // Set time to end of day to include the last day
+    now.setHours(23, 59, 59, 999);
+    let startDate;
+    let intervalDays;
+
+    // Calculate start date and interval based on range type
+    switch (rangeType) {
+        case '30days':
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 30);
+            intervalDays = 1; // Daily
+            break;
+        case 'quarter':
+            startDate = new Date(now);
+            startDate.setMonth(startDate.getMonth() - 3);
+            intervalDays = 3; // Every 3 days
+            break;
+        case '6months':
+            startDate = new Date(now);
+            startDate.setMonth(startDate.getMonth() - 6);
+            intervalDays = 7; // Weekly
+            break;
+        case '1year':
+            startDate = new Date(now);
+            startDate.setFullYear(startDate.getFullYear() - 1);
+            intervalDays = 7; // Weekly
+            break;
+        default:
+            throw new Error('Invalid range type');
+    }
+
+    // Ensure startDate doesn't go before the first available image
+    if (startDate < firstDate) {
+        startDate = new Date(firstDate);
+    }
+
+    const selectedImages = [];
+    let currentDate = new Date(startDate);
+    // Reset time to start of day
+    currentDate.setHours(0, 0, 0, 0);
+
+    logger.info(`Slideshow range: ${rangeType}, Start: ${startDate.toISOString()}, End: ${now.toISOString()}, First image: ${firstDateStr}, Last image: ${lastDateStr}`);
+
+    while (currentDate <= now) {
+        const dateStr = currentDate.getFullYear().toString() +
+                       String(currentDate.getMonth() + 1).padStart(2, '0') +
+                       String(currentDate.getDate()).padStart(2, '0');
+
+        // Find all images for this date
+        const dayImages = sortedFiles.filter(file => {
+            const fileDateStr = file.slice(0, 8);
+            return fileDateStr === dateStr;
+        });
+
+        if (dayImages.length > 0) {
+            // Find the image closest to 12 PM (12:00:00)
+            // Target time: 120000
+            let closestImage = null;
+            let minTimeDiff = Infinity;
+            const targetTime = 120000; // 12:00:00 in HHMMSS format
+
+            dayImages.forEach(file => {
+                const fileTimeStr = file.slice(8, 14);
+                const fileTime = parseInt(fileTimeStr);
+                
+                // Calculate time difference (absolute value)
+                const timeDiff = Math.abs(fileTime - targetTime);
+                
+                if (timeDiff < minTimeDiff) {
+                    minTimeDiff = timeDiff;
+                    closestImage = file;
+                }
+            });
+
+            // Only include if the closest image is within 2 hours of 12 PM (10:00 - 14:00)
+            if (closestImage) {
+                const closestTime = parseInt(closestImage.slice(8, 14));
+                const hour = Math.floor(closestTime / 10000);
+                
+                // Accept images between 10:00 and 14:00 (10 AM to 2 PM)
+                if (hour >= 10 && hour <= 14) {
+                    selectedImages.push(closestImage);
+                }
+            }
+        }
+
+        // Move to next interval
+        currentDate.setDate(currentDate.getDate() + intervalDays);
+    }
+
+    return selectedImages.sort();
+}
+
+/**
+ * Get slideshow images for last 30 days
+ */
+async function getSlideshow30Days(req, res) {
+    try {
+        const { developerId, projectId, cameraId } = req.params;
+        const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/large/`;
+
+        const images = await getSlideshowImages(s3Prefix, '30days');
+
+        res.json({
+            images: images,
+            count: images.length,
+            rangeType: '30days',
+            description: 'Last 30 days - Daily images at 12 PM'
+        });
+    } catch (error) {
+        logger.error('Error in getSlideshow30Days (S3):', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get slideshow images for last quarter (3 months)
+ */
+async function getSlideshowQuarter(req, res) {
+    try {
+        const { developerId, projectId, cameraId } = req.params;
+        const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/large/`;
+
+        const images = await getSlideshowImages(s3Prefix, 'quarter');
+
+        res.json({
+            images: images,
+            count: images.length,
+            rangeType: 'quarter',
+            description: 'Last quarter (3 months) - Every 3 days at 12 PM'
+        });
+    } catch (error) {
+        logger.error('Error in getSlideshowQuarter (S3):', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get slideshow images for last 6 months
+ */
+async function getSlideshow6Months(req, res) {
+    try {
+        const { developerId, projectId, cameraId } = req.params;
+        const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/large/`;
+
+        const images = await getSlideshowImages(s3Prefix, '6months');
+
+        res.json({
+            images: images,
+            count: images.length,
+            rangeType: '6months',
+            description: 'Last 6 months - Weekly images at 12 PM'
+        });
+    } catch (error) {
+        logger.error('Error in getSlideshow6Months (S3):', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get slideshow images for last 1 year
+ */
+async function getSlideshow1Year(req, res) {
+    try {
+        const { developerId, projectId, cameraId } = req.params;
+        const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/large/`;
+
+        const images = await getSlideshowImages(s3Prefix, '1year');
+
+        res.json({
+            images: images,
+            count: images.length,
+            rangeType: '1year',
+            description: 'Last 1 year - Weekly images at 12 PM'
+        });
+    } catch (error) {
+        logger.error('Error in getSlideshow1Year (S3):', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
 module.exports = {
     getEmaarPics,
     getCameraPreview,
     generateWeeklyVideo,
-    getCameraPictures
+    getCameraPictures,
+    getImagePresignedUrl,
+    getSlideshow30Days,
+    getSlideshowQuarter,
+    getSlideshow6Months,
+    getSlideshow1Year
 };
 

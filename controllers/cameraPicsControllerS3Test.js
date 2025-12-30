@@ -614,6 +614,12 @@ async function proxyImage(req, res) {
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
             res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+            
+            // CRITICAL: Set COEP to allow cross-origin resources
+            res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+            
             res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
             // Set content type

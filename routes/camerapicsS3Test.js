@@ -7,6 +7,8 @@ const authMiddleware = require('../controllers/authMiddleware');
 // These routes mirror the original routes but use S3 storage
 
 router.get('/emaar/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getEmaarPics);
+// Route to proxy image with CORS headers (no auth required for images - place before authMiddleware)
+router.get('/proxy/:developerId/:projectId/:cameraId/:imageTimestamp', cameraPicsControllerS3Test.proxyImage);
 router.use(authMiddleware);
 // Define the route to get camera pictures by developer, project, and camera ID, with an optional date filter
 router.post('/:developerId/:projectId/:cameraId/pictures/', cameraPicsControllerS3Test.getCameraPictures);

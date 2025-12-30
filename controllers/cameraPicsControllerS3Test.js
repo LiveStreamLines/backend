@@ -4,6 +4,8 @@ const ffmpeg = require('fluent-ffmpeg');
 const logger = require('../logger');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
 // S3 Configuration for Camera Pictures
 // You can override these with environment variables
@@ -578,6 +580,64 @@ async function getSlideshow1Year(req, res) {
     }
 }
 
+/**
+ * Proxy image from S3 with CORS headers
+ * This endpoint fetches the image from S3 and serves it with proper CORS headers
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ */
+async function proxyImage(req, res) {
+    try {
+        const { developerId, projectId, cameraId, imageTimestamp } = req.params;
+
+        // Validate image timestamp format (YYYYMMDDHHMMSS)
+        const timestampRegex = /^\d{14}$/;
+        if (!timestampRegex.test(imageTimestamp)) {
+            return res.status(400).json({ 
+                error: 'Invalid image timestamp format. Use YYYYMMDDHHMMSS format (e.g., 20240114143000)' 
+            });
+        }
+
+        // Construct the S3 key
+        const s3Key = `upload/${developerId}/${projectId}/${cameraId}/large/${imageTimestamp}.jpg`;
+
+        // Generate presigned URL
+        const presignedUrl = await getPresignedUrl(s3Key);
+
+        // Parse the URL to determine protocol
+        const url = new URL(presignedUrl);
+        const client = url.protocol === 'https:' ? https : http;
+
+        // Fetch the image from S3
+        client.get(presignedUrl, (s3Response) => {
+            // Set CORS headers
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
+            // Set content type
+            const contentType = s3Response.headers['content-type'] || 'image/jpeg';
+            res.setHeader('Content-Type', contentType);
+
+            // Handle errors from S3
+            if (s3Response.statusCode !== 200) {
+                logger.error(`S3 returned status ${s3Response.statusCode} for image ${imageTimestamp}`);
+                return res.status(s3Response.statusCode).json({ error: 'Failed to fetch image from S3' });
+            }
+
+            // Pipe the image data to the response
+            s3Response.pipe(res);
+        }).on('error', (error) => {
+            logger.error('Error proxying image from S3:', error);
+            res.status(500).json({ error: 'Failed to proxy image', message: error.message });
+        });
+    } catch (error) {
+        logger.error('Error in proxyImage:', error);
+        res.status(500).json({ error: 'Failed to proxy image', message: error.message });
+    }
+}
+
 module.exports = {
     getEmaarPics,
     getCameraPreview,
@@ -587,6 +647,7 @@ module.exports = {
     getSlideshow30Days,
     getSlideshowQuarter,
     getSlideshow6Months,
-    getSlideshow1Year
+    getSlideshow1Year,
+    proxyImage
 };
 

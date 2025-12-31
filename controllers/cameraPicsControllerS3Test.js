@@ -589,10 +589,13 @@ async function getSlideshow1Year(req, res) {
 async function proxyImage(req, res) {
     try {
         const { developerId, projectId, cameraId, imageTimestamp } = req.params;
+        
+        logger.info(`Proxy image request: ${developerId}/${projectId}/${cameraId}/${imageTimestamp}`);
 
         // Validate image timestamp format (YYYYMMDDHHMMSS)
         const timestampRegex = /^\d{14}$/;
         if (!timestampRegex.test(imageTimestamp)) {
+            logger.warn(`Invalid timestamp format: ${imageTimestamp}`);
             return res.status(400).json({ 
                 error: 'Invalid image timestamp format. Use YYYYMMDDHHMMSS format (e.g., 20240114143000)' 
             });

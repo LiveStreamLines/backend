@@ -9,6 +9,15 @@ const authMiddleware = require('../controllers/authMiddleware');
 router.get('/emaar/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getEmaarPics);
 // Route to proxy image with CORS headers (no auth required for images - place before authMiddleware)
 router.get('/proxy/:developerId/:projectId/:cameraId/:imageTimestamp', cameraPicsControllerS3Test.proxyImage);
+// Handle OPTIONS preflight for proxy endpoint
+router.options('/proxy/:developerId/:projectId/:cameraId/:imageTimestamp', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.status(204).send();
+});
 router.use(authMiddleware);
 // Define the route to get camera pictures by developer, project, and camera ID, with an optional date filter
 router.post('/:developerId/:projectId/:cameraId/pictures/', cameraPicsControllerS3Test.getCameraPictures);

@@ -29,6 +29,124 @@ const CAMERA_BUCKET_NAME = process.env.S3_CAMERA_BUCKET_NAME || process.env.S3_B
 // Presigned URL expiration (7 days)
 const PRESIGNED_URL_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 
+// Camera pics JSON files directory
+const CAMERA_PICS_DIR = path.join(__dirname, '../data/camerapics');
+
+/**
+ * Get camera pics JSON file path
+ * @param {string} developerTag - Developer tag (e.g., "amana")
+ * @param {string} projectTag - Project tag (e.g., "dsv")
+ * @param {string} cameraTag - Camera tag/name (e.g., "camera1")
+ * @returns {string} Full path to the JSON file
+ */
+function getCameraPicsFilePath(developerTag, projectTag, cameraTag) {
+    const fileName = `${developerTag}-${projectTag}-${cameraTag}.json`;
+    return path.join(CAMERA_PICS_DIR, fileName);
+}
+
+/**
+ * Read camera pics from JSON file
+ * @param {string} developerTag - Developer tag
+ * @param {string} projectTag - Project tag
+ * @param {string} cameraTag - Camera tag/name
+ * @returns {Promise<string[]>} Array of image filenames (e.g., ["20230101110101.jpg", "20230101113001.jpg"])
+ */
+async function readCameraPicsFromFile(developerTag, projectTag, cameraTag) {
+    try {
+        const filePath = getCameraPicsFilePath(developerTag, projectTag, cameraTag);
+        
+        if (!fs.existsSync(filePath)) {
+            logger.warn(`Camera pics file not found: ${filePath}`);
+            return [];
+        }
+
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        
+        // Try to parse as JSON array first
+        try {
+            const jsonData = JSON.parse(fileContent);
+            if (Array.isArray(jsonData)) {
+                return jsonData;
+            }
+        } catch (e) {
+            // If not JSON, try comma-separated string
+            const images = fileContent
+                .split(',')
+                .map(img => img.trim())
+                .filter(img => img.length > 0 && img.endsWith('.jpg'));
+            return images;
+        }
+        
+        return [];
+    } catch (error) {
+        logger.error(`Error reading camera pics file for ${developerTag}/${projectTag}/${cameraTag}:`, error);
+        return [];
+    }
+}
+
+/**
+ * Get last photo from camera pics file
+ * @param {string} developerTag - Developer tag
+ * @param {string} projectTag - Project tag
+ * @param {string} cameraTag - Camera tag/name
+ * @returns {Promise<string>} Last photo filename (without .jpg extension) or empty string
+ */
+async function getLastPhotoFromFile(developerTag, projectTag, cameraTag) {
+    const images = await readCameraPicsFromFile(developerTag, projectTag, cameraTag);
+    if (images.length === 0) {
+        return '';
+    }
+    
+    // Sort images (they should already be sorted, but just in case)
+    const sorted = images.map(img => img.replace('.jpg', '')).sort();
+    return sorted[sorted.length - 1];
+}
+
+/**
+ * Get first photo from camera pics file
+ * @param {string} developerTag - Developer tag
+ * @param {string} projectTag - Project tag
+ * @param {string} cameraTag - Camera tag/name
+ * @returns {Promise<string>} First photo filename (without .jpg extension) or empty string
+ */
+async function getFirstPhotoFromFile(developerTag, projectTag, cameraTag) {
+    const images = await readCameraPicsFromFile(developerTag, projectTag, cameraTag);
+    if (images.length === 0) {
+        return '';
+    }
+    
+    // Sort images and get first
+    const sorted = images.map(img => img.replace('.jpg', '')).sort();
+    return sorted[0];
+}
+
+/**
+ * Filter images by date range from camera pics file
+ * @param {string} developerTag - Developer tag
+ * @param {string} projectTag - Project tag
+ * @param {string} cameraTag - Camera tag/name
+ * @param {string} date1 - Start date in YYYYMMDD format
+ * @param {string} date2 - End date in YYYYMMDD format
+ * @returns {Promise<string[]>} Array of image filenames (without .jpg extension) matching the date range
+ */
+async function getImagesByDateRangeFromFile(developerTag, projectTag, cameraTag, date1, date2) {
+    const images = await readCameraPicsFromFile(developerTag, projectTag, cameraTag);
+    if (images.length === 0) {
+        return [];
+    }
+    
+    // Filter images by date range
+    const filtered = images
+        .map(img => img.replace('.jpg', ''))
+        .filter(timestamp => {
+            const imageDate = timestamp.substring(0, 8); // Extract YYYYMMDD
+            return imageDate >= date1 && imageDate <= date2;
+        })
+        .sort();
+    
+    return filtered;
+}
+
 /**
  * List all objects in S3 with the given prefix
  * @param {string} prefix - S3 key prefix (e.g., "upload/developer1/project1/camera1/large/")
@@ -147,10 +265,55 @@ async function getCameraPictures(req, res) {
         const { developerId, projectId, cameraId } = req.params;
         const { date1, date2 } = req.body; // Optional date filters in the format YYYYMMDD
 
-        // S3 prefix path: upload/{developerId}/{projectId}/{cameraId}/large/
-        const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/large/`;
+        // Note: developerId, projectId, cameraId in route params are actually tags
+        const developerTag = developerId;
+        const projectTag = projectId;
+        const cameraTag = cameraId;
 
-        // OPTIMIZATION: If no date filters, use faster method to get only first and last
+        // S3 prefix path: upload/{developerTag}/{projectTag}/{cameraTag}/large/
+        const s3Prefix = `upload/${developerTag}/${projectTag}/${cameraTag}/large/`;
+
+        // OPTIMIZATION: Read from camera pics JSON file instead of S3 (much faster)
+        // Try to read from file first
+        const firstPic = await getFirstPhotoFromFile(developerTag, projectTag, cameraTag);
+        const lastPic = await getLastPhotoFromFile(developerTag, projectTag, cameraTag);
+
+        // If we have data from file, use it
+        if (firstPic || lastPic) {
+            logger.info(`Reading camera pics from file: ${developerTag}-${projectTag}-${cameraTag}`);
+            
+            // If date filters are provided, filter by date
+            if (date1 || date2) {
+                const defaultDate1 = firstPic ? firstPic.substring(0, 8) : '';
+                const defaultDate2 = lastPic ? lastPic.substring(0, 8) : '';
+                const dateFilter1 = date1 || defaultDate1;
+                const dateFilter2 = date2 || defaultDate2;
+
+                const date1Photos = await getImagesByDateRangeFromFile(developerTag, projectTag, cameraTag, dateFilter1, dateFilter1);
+                const date2Photos = await getImagesByDateRangeFromFile(developerTag, projectTag, cameraTag, dateFilter2, dateFilter2);
+
+                return res.json({
+                    firstPhoto: firstPic,
+                    lastPhoto: lastPic,
+                    date1Photos: date1Photos,
+                    date2Photos: date2Photos,
+                    path: `${req.protocol}://${req.get('host')}/media/upload/${developerTag}/${projectTag}/${cameraTag}/`
+                });
+            }
+
+            // No date filters - return first and last
+            return res.json({
+                firstPhoto: firstPic,
+                lastPhoto: lastPic,
+                date1Photos: [],
+                date2Photos: [],
+                path: `${req.protocol}://${req.get('host')}/media/upload/${developerTag}/${projectTag}/${cameraTag}/`
+            });
+        }
+
+        // Fallback to S3 if file doesn't exist (for backward compatibility)
+        logger.warn(`Camera pics file not found: ${developerTag}-${projectTag}-${cameraTag}, falling back to S3`);
+        
         if (!date1 && !date2) {
             // Get first image (first page, first object)
             const firstCommand = new ListObjectsV2Command({
@@ -160,31 +323,31 @@ async function getCameraPictures(req, res) {
             });
             
             const firstResponse = await s3Client.send(firstCommand);
-            let firstPic = '';
+            let firstPicS3 = '';
             if (firstResponse.Contents && firstResponse.Contents.length > 0) {
                 const firstKey = firstResponse.Contents[0].Key;
                 if (firstKey.endsWith('.jpg')) {
-                    firstPic = extractFilename(firstKey);
+                    firstPicS3 = extractFilename(firstKey);
                 }
             }
 
             // Get last image using optimized pagination
-            const lastPic = await getLastImageOnly(s3Prefix);
+            const lastPicS3 = await getLastImageOnly(s3Prefix);
 
-            if (!firstPic && !lastPic) {
+            if (!firstPicS3 && !lastPicS3) {
                 return res.json({ error: 'No pictures found in camera directory' });
             }
 
             return res.json({
-                firstPhoto: firstPic,
-                lastPhoto: lastPic,
+                firstPhoto: firstPicS3,
+                lastPhoto: lastPicS3,
                 date1Photos: [],
                 date2Photos: [],
                 path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
             });
         }
 
-        // If date filters are provided, we need to list all objects (slower but necessary)
+        // If date filters are provided and file doesn't exist, fallback to S3
         const objectKeys = await listS3Objects(s3Prefix);
 
         // Filter only .jpg files
@@ -198,12 +361,12 @@ async function getCameraPictures(req, res) {
         const files = jpgKeys.map(key => extractFilename(key));
         const sortedFiles = files.sort();
 
-        const firstPic = sortedFiles[0];
-        const lastPic = sortedFiles[sortedFiles.length - 1];
+        const firstPicS3 = sortedFiles[0];
+        const lastPicS3 = sortedFiles[sortedFiles.length - 1];
 
-        // Extract dates from firstPic and lastPic if date1 or date2 are not provided
-        const defaultDate1 = firstPic.slice(0, 8); // YYYYMMDD format
-        const defaultDate2 = lastPic.slice(0, 8); // YYYYMMDD format
+        // Extract dates from firstPicS3 and lastPicS3 if date1 or date2 are not provided
+        const defaultDate1 = firstPicS3.slice(0, 8); // YYYYMMDD format
+        const defaultDate2 = lastPicS3.slice(0, 8); // YYYYMMDD format
         const dateFilter1 = date1 || defaultDate1;
         const dateFilter2 = date2 || defaultDate2;
 
@@ -213,11 +376,11 @@ async function getCameraPictures(req, res) {
 
         // Respond with the first, last, date1, and date2 pictures
         res.json({
-            firstPhoto: firstPic,
-            lastPhoto: lastPic,
+            firstPhoto: firstPicS3,
+            lastPhoto: lastPicS3,
             date1Photos: date1Files,
             date2Photos: date2Files,
-            path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
+            path: `${req.protocol}://${req.get('host')}/media/upload/${developerTag}/${projectTag}/${cameraTag}/`
         });
     } catch (error) {
         logger.error('Error in getCameraPictures (S3):', error);

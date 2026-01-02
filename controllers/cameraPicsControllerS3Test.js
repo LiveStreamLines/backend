@@ -43,7 +43,8 @@ async function listS3Objects(prefix) {
             const command = new ListObjectsV2Command({
                 Bucket: CAMERA_BUCKET_NAME,
                 Prefix: prefix,
-                ContinuationToken: continuationToken
+                ContinuationToken: continuationToken,
+                MaxKeys: 1000 // Limit per page for better performance
             });
 
             const response = await s3Client.send(command);
@@ -59,6 +60,54 @@ async function listS3Objects(prefix) {
     } catch (error) {
         logger.error('Error listing S3 objects:', error);
         throw new Error(`Failed to list objects from S3: ${error.message}`);
+    }
+}
+
+/**
+ * Get only the last image for a camera (optimized - doesn't list all objects)
+ * Uses pagination to get to the last page efficiently
+ */
+async function getLastImageOnly(prefix) {
+    try {
+        let lastKey = null;
+        let continuationToken = undefined;
+        let hasMore = true;
+
+        // Paginate through to get the last page
+        while (hasMore) {
+            const command = new ListObjectsV2Command({
+                Bucket: CAMERA_BUCKET_NAME,
+                Prefix: prefix,
+                MaxKeys: 1000,
+                ContinuationToken: continuationToken
+            });
+
+            const response = await s3Client.send(command);
+            
+            if (response.Contents && response.Contents.length > 0) {
+                // Filter .jpg files and get the last one from this page
+                const jpgKeys = response.Contents
+                    .map(obj => obj.Key)
+                    .filter(key => key.endsWith('.jpg'))
+                    .sort();
+                
+                if (jpgKeys.length > 0) {
+                    lastKey = jpgKeys[jpgKeys.length - 1];
+                }
+            }
+
+            continuationToken = response.NextContinuationToken;
+            hasMore = !!continuationToken;
+        }
+
+        if (lastKey) {
+            return extractFilename(lastKey);
+        }
+
+        return '';
+    } catch (error) {
+        logger.error('Error getting last image only:', error);
+        return '';
     }
 }
 
@@ -101,7 +150,41 @@ async function getCameraPictures(req, res) {
         // S3 prefix path: upload/{developerId}/{projectId}/{cameraId}/large/
         const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/large/`;
 
-        // List all objects with this prefix
+        // OPTIMIZATION: If no date filters, use faster method to get only first and last
+        if (!date1 && !date2) {
+            // Get first image (first page, first object)
+            const firstCommand = new ListObjectsV2Command({
+                Bucket: CAMERA_BUCKET_NAME,
+                Prefix: s3Prefix,
+                MaxKeys: 1
+            });
+            
+            const firstResponse = await s3Client.send(firstCommand);
+            let firstPic = '';
+            if (firstResponse.Contents && firstResponse.Contents.length > 0) {
+                const firstKey = firstResponse.Contents[0].Key;
+                if (firstKey.endsWith('.jpg')) {
+                    firstPic = extractFilename(firstKey);
+                }
+            }
+
+            // Get last image using optimized pagination
+            const lastPic = await getLastImageOnly(s3Prefix);
+
+            if (!firstPic && !lastPic) {
+                return res.json({ error: 'No pictures found in camera directory' });
+            }
+
+            return res.json({
+                firstPhoto: firstPic,
+                lastPhoto: lastPic,
+                date1Photos: [],
+                date2Photos: [],
+                path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
+            });
+        }
+
+        // If date filters are provided, we need to list all objects (slower but necessary)
         const objectKeys = await listS3Objects(s3Prefix);
 
         // Filter only .jpg files

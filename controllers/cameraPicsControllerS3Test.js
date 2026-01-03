@@ -46,6 +46,9 @@ function getCameraPicsFilePath(developerTag, projectTag, cameraTag) {
 
 /**
  * Read camera pics from JSON file
+ * Supports two formats:
+ * 1. New format: { "developer": "...", "project": "...", "camera": "...", "images": [...] }
+ * 2. Old format: ["20230101110101.jpg", "20230101113001.jpg"] (array)
  * @param {string} developerTag - Developer tag
  * @param {string} projectTag - Project tag
  * @param {string} cameraTag - Camera tag/name
@@ -62,9 +65,17 @@ async function readCameraPicsFromFile(developerTag, projectTag, cameraTag) {
 
         const fileContent = fs.readFileSync(filePath, 'utf8');
         
-        // Try to parse as JSON array first
         try {
             const jsonData = JSON.parse(fileContent);
+            
+            // New format: object with images array
+            if (jsonData && typeof jsonData === 'object' && !Array.isArray(jsonData)) {
+                if (jsonData.images && Array.isArray(jsonData.images)) {
+                    return jsonData.images;
+                }
+            }
+            
+            // Old format: direct array
             if (Array.isArray(jsonData)) {
                 return jsonData;
             }

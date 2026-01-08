@@ -21,6 +21,8 @@ router.options('/proxy/:developerId/:projectId/:cameraId/:imageTimestamp', (req,
 router.use(authMiddleware);
 // Define the route to get camera pictures by developer, project, and camera ID, with an optional date filter
 router.post('/:developerId/:projectId/:cameraId/pictures/', cameraPicsControllerS3Test.getCameraPictures);
+// New optimized endpoint to get all available dates for a camera
+router.get('/:developerId/:projectId/:cameraId/available-dates', cameraPicsControllerS3Test.getAvailableDates);
 router.get('/preview/:developerId/:projectId/:cameraId/', cameraPicsControllerS3Test.getCameraPreview);
 router.get('/preview-video/:developerId/:projectId/:cameraId/', cameraPicsControllerS3Test.generateWeeklyVideo);
 // Route to get presigned URL for an image

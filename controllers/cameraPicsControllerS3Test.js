@@ -904,6 +904,96 @@ async function proxyImage(req, res) {
     }
 }
 
+/**
+ * Get all available dates for a camera (optimized endpoint)
+ * Returns unique dates that have images, without loading all image timestamps
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ */
+async function getAvailableDates(req, res) {
+    try {
+        const { developerId, projectId, cameraId } = req.params;
+        
+        // Note: developerId, projectId, cameraId in route params are actually tags
+        const developerTag = developerId;
+        const projectTag = projectId;
+        const cameraTag = cameraId;
+
+        // Try to read from camera pics JSON file first (much faster)
+        const images = await readCameraPicsFromFile(developerTag, projectTag, cameraTag);
+        
+        if (images.length > 0) {
+            logger.info(`Reading available dates from file: ${developerTag}-${projectTag}-${cameraTag}`);
+            
+            // Extract unique dates from image filenames
+            const datesSet = new Set();
+            images.forEach(img => {
+                const timestamp = img.replace('.jpg', '');
+                if (timestamp.length >= 8) {
+                    const dateStr = timestamp.substring(0, 8); // YYYYMMDD
+                    // Convert to YYYY-MM-DD format for frontend
+                    const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                    datesSet.add(formattedDate);
+                }
+            });
+
+            const availableDates = Array.from(datesSet).sort();
+            
+            return res.json({
+                availableDates: availableDates,
+                count: availableDates.length,
+                firstDate: availableDates[0] || null,
+                lastDate: availableDates[availableDates.length - 1] || null,
+                source: 'file'
+            });
+        }
+
+        // Fallback to S3 if file doesn't exist
+        logger.warn(`Camera pics file not found: ${developerTag}-${projectTag}-${cameraTag}, falling back to S3`);
+        
+        const s3Prefix = `upload/${developerTag}/${projectTag}/${cameraTag}/large/`;
+        const objectKeys = await listS3Objects(s3Prefix);
+        
+        // Filter only .jpg files
+        const jpgKeys = objectKeys.filter(key => key.endsWith('.jpg'));
+        
+        if (jpgKeys.length === 0) {
+            return res.json({
+                availableDates: [],
+                count: 0,
+                firstDate: null,
+                lastDate: null,
+                source: 's3'
+            });
+        }
+
+        // Extract unique dates from S3 keys
+        const datesSet = new Set();
+        jpgKeys.forEach(key => {
+            const filename = extractFilename(key);
+            if (filename.length >= 8) {
+                const dateStr = filename.substring(0, 8); // YYYYMMDD
+                // Convert to YYYY-MM-DD format for frontend
+                const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                datesSet.add(formattedDate);
+            }
+        });
+
+        const availableDates = Array.from(datesSet).sort();
+        
+        res.json({
+            availableDates: availableDates,
+            count: availableDates.length,
+            firstDate: availableDates[0] || null,
+            lastDate: availableDates[availableDates.length - 1] || null,
+            source: 's3'
+        });
+    } catch (error) {
+        logger.error('Error in getAvailableDates:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
 module.exports = {
     getEmaarPics,
     getCameraPreview,
@@ -914,6 +1004,7 @@ module.exports = {
     getSlideshowQuarter,
     getSlideshow6Months,
     getSlideshow1Year,
-    proxyImage
+    proxyImage,
+    getAvailableDates
 };
 

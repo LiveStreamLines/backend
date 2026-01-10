@@ -27,6 +27,8 @@ router.get('/preview/:developerId/:projectId/:cameraId/', cameraPicsControllerS3
 router.get('/preview-video/:developerId/:projectId/:cameraId/', cameraPicsControllerS3Test.generateWeeklyVideo);
 // Route to get presigned URL for an image
 router.get('/image/:developerId/:projectId/:cameraId/:imageTimestamp', cameraPicsControllerS3Test.getImagePresignedUrl);
+// Route to get presigned URL for a thumbnail
+router.get('/thumbnail/:developerId/:projectId/:cameraId/:imageTimestamp', cameraPicsControllerS3Test.getThumbnailPresignedUrl);
 // Slideshow routes
 router.get('/slideshow/30days/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getSlideshow30Days);
 router.get('/slideshow/quarter/:developerId/:projectId/:cameraId', cameraPicsControllerS3Test.getSlideshowQuarter);

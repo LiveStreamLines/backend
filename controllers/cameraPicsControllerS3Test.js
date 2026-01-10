@@ -616,6 +616,41 @@ async function getImagePresignedUrl(req, res) {
 }
 
 /**
+ * Get presigned URL for a thumbnail image
+ * Route: GET /api/camerapics-s3-test/thumbnail/:developerId/:projectId/:cameraId/:imageTimestamp
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function getThumbnailPresignedUrl(req, res) {
+    try {
+        const { developerId, projectId, cameraId, imageTimestamp } = req.params;
+
+        // Validate image timestamp format (YYYYMMDDHHMMSS)
+        const timestampRegex = /^\d{14}$/;
+        if (!timestampRegex.test(imageTimestamp)) {
+            return res.status(400).json({ 
+                error: 'Invalid image timestamp format. Use YYYYMMDDHHMMSS format (e.g., 20240114143000)' 
+            });
+        }
+
+        // Construct the S3 key for thumbnail: upload/{developer}/{project}/{camera}/thumbs/{timestamp}.jpg
+        const s3Key = `upload/${developerId}/${projectId}/${cameraId}/thumbs/${imageTimestamp}.jpg`;
+
+        // Generate presigned URL
+        const presignedUrl = await getPresignedUrl(s3Key);
+
+        res.json({
+            url: presignedUrl,
+            key: s3Key,
+            expiresIn: PRESIGNED_URL_EXPIRY
+        });
+    } catch (error) {
+        logger.error('Error in getThumbnailPresignedUrl (S3):', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
  * Get images for slideshow based on time range
  * @param {string} s3Prefix - S3 prefix path
  * @param {string} rangeType - '30days', 'quarter', '6months', '1year'
@@ -1000,6 +1035,7 @@ module.exports = {
     generateWeeklyVideo,
     getCameraPictures,
     getImagePresignedUrl,
+    getThumbnailPresignedUrl,
     getSlideshow30Days,
     getSlideshowQuarter,
     getSlideshow6Months,

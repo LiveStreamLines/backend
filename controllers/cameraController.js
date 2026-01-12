@@ -131,7 +131,7 @@ function getAllCameras(req, res) {
 }
 
 function getAllActiveCameras(req, res) {
-    const cameras = cameraData.getAllActiveItems();
+    const cameras = cameraData.getAllItems();
     res.json(cameras);
 }
 

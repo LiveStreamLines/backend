@@ -819,8 +819,8 @@ function checkCameraOptimized(req, res) {
     try {
         const { developerTag, projectTag, cameraName } = req.params;
         
-        // Create camera identifier in format: developerTag-projectTag-cameraName
-        const cameraIdentifier = `${developerTag}-${projectTag}-${cameraName}`;
+        // Create camera identifier in format: developerTag/projectTag/cameraName (with forward slashes)
+        const cameraIdentifier = `${developerTag}/${projectTag}/${cameraName}`;
         
         // Path to optimized.json file
         const optimizedFilePath = path.join(__dirname, '../data/optimized.json');
@@ -832,25 +832,20 @@ function checkCameraOptimized(req, res) {
         
         // Read and parse the optimized.json file
         const fileContent = fs.readFileSync(optimizedFilePath, 'utf8');
-        let optimizedCameras = [];
+        let optimizedData = {};
         
         try {
-            optimizedCameras = JSON.parse(fileContent);
+            optimizedData = JSON.parse(fileContent);
         } catch (parseError) {
             logger.error('Error parsing optimized.json:', parseError);
             return res.json({ isOptimized: false });
         }
         
-        // Check if camera identifier is in the list
-        // Support both array format and object format
+        // Check if camera identifier is in the data array
         let isOptimized = false;
         
-        if (Array.isArray(optimizedCameras)) {
-            isOptimized = optimizedCameras.includes(cameraIdentifier);
-        } else if (typeof optimizedCameras === 'object') {
-            // If it's an object, check if the key exists or if it's in a values array
-            isOptimized = optimizedCameras[cameraIdentifier] !== undefined || 
-                         Object.values(optimizedCameras).includes(cameraIdentifier);
+        if (optimizedData && optimizedData.data && Array.isArray(optimizedData.data)) {
+            isOptimized = optimizedData.data.includes(cameraIdentifier);
         }
         
         res.json({ isOptimized });

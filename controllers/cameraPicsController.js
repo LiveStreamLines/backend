@@ -60,6 +60,7 @@ function getCameraPictures (req, res) {
 
   // Determine which directory was used for the path
   const directoryUsed = cameraPath === optimizedPath ? 'optimized' : 'large';
+  const basePath = `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}`;
 
   // Respond with the first, last, date1, and date2 pictures
   res.json({
@@ -67,8 +68,10 @@ function getCameraPictures (req, res) {
     lastPhoto: lastPic.replace('.jpg', ''), // Filename without extension
     date1Photos: date1Files.map(file => file.replace('.jpg', '')),
     date2Photos: date2Files.map(file => file.replace('.jpg', '')),
-    path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`,
-    directory: directoryUsed // Indicate which directory was used
+    path: `${basePath}/`,
+    directory: directoryUsed, // Indicate which directory was used
+    largepath: `${basePath}/${directoryUsed}`, // Path to large/optimized directory
+    thumbpath: `${basePath}/thumbs` // Path to thumbs directory
   });
 }
 

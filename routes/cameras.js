@@ -89,6 +89,7 @@ const internalAttachmentUpload = multer({
 });
 
 router.get('/', cameraController.getAllCameras);
+router.get('/active', cameraController.getAllActiveCameras);
 router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
 router.get('/maintenance-cycle/start-date', cameraController.getMaintenanceCycleStartDate);
 router.get('/:id', cameraController.getCameraById);

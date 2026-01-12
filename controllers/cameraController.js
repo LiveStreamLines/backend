@@ -130,6 +130,11 @@ function getAllCameras(req, res) {
     res.json(cameras);
 }
 
+function getAllActiveCameras(req, res) {
+    const cameras = cameraData.getAllActiveItems();
+    res.json(cameras);
+}
+
 // Controller for getting a single Camera by ID
 function getCameraById(req, res) {
     const camera = cameraData.getItemById(req.params.id);

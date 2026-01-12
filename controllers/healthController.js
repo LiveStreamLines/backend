@@ -11,8 +11,8 @@ const deviceTypeData = require('../models/deviceTypeData');
 const cameraStatusHistoryController = require('./cameraStatusHistoryController');
 
 // Define the root directory for camera pictures
-const mediaRoot = process.env.MEDIA_PATH + '/upload';
-
+//const mediaRoot = process.env.MEDIA_PATH + '/upload';
+const mediaRoot = "/var/media/upload";
 // Helper function to calculate validity left for an inventory item
 function calculateValidityLeft(inventoryItem, deviceTypes) {
   // Get total validity days from device type or item

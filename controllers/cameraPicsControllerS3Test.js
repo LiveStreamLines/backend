@@ -1,4 +1,4 @@
-const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, ListObjectsV2Command, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const ffmpeg = require('fluent-ffmpeg');
 const logger = require('../logger');
@@ -582,7 +582,31 @@ async function getEmaarPics(req, res) {
 }
 
 /**
+ * Check if an S3 object exists
+ * @param {string} key - S3 key to check
+ * @returns {Promise<boolean>} - True if object exists, false otherwise
+ */
+async function checkObjectExists(key) {
+    try {
+        const command = new HeadObjectCommand({
+            Bucket: CAMERA_BUCKET_NAME,
+            Key: key
+        });
+        await s3Client.send(command);
+        return true;
+    } catch (error) {
+        if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+            return false;
+        }
+        // For other errors, log and return false
+        logger.warn(`Error checking object existence for ${key}:`, error.message);
+        return false;
+    }
+}
+
+/**
  * Get presigned URL for a camera image
+ * Tries optimized folder first, falls back to large folder if not found
  * @param {Request} req - Express request object
  * @param {Response} res - Express response object
  */
@@ -598,15 +622,28 @@ async function getImagePresignedUrl(req, res) {
             });
         }
 
-        // Construct the S3 key
-        const s3Key = `upload/${developerId}/${projectId}/${cameraId}/large/${imageTimestamp}.jpg`;
+        // Try optimized folder first, fallback to large if not found
+        let s3Key = `upload/${developerId}/${projectId}/${cameraId}/optimized/${imageTimestamp}.jpg`;
+        let presignedUrl;
+        let usedFolder = 'optimized';
+
+        // Check if optimized image exists
+        const optimizedExists = await checkObjectExists(s3Key);
+        
+        if (!optimizedExists) {
+            // Fallback to large folder
+            logger.info(`Optimized image not found for ${imageTimestamp}, falling back to large folder`);
+            s3Key = `upload/${developerId}/${projectId}/${cameraId}/large/${imageTimestamp}.jpg`;
+            usedFolder = 'large';
+        }
 
         // Generate presigned URL
-        const presignedUrl = await getPresignedUrl(s3Key);
+        presignedUrl = await getPresignedUrl(s3Key);
 
         res.json({
             url: presignedUrl,
             key: s3Key,
+            folder: usedFolder,
             expiresIn: PRESIGNED_URL_EXPIRY
         });
     } catch (error) {

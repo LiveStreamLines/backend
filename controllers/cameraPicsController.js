@@ -60,7 +60,7 @@ function getCameraPictures (req, res) {
 
   // Determine which directory was used for the path
   const directoryUsed = cameraPath === optimizedPath ? 'optimized' : 'large';
-  const basePath = `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}`;
+  const basePath = `${req.protocol}://${req.get('host')}/backend/media/upload/${developerId}/${projectId}/${cameraId}`;
 
   // Respond with the first, last, date1, and date2 pictures
   res.json({

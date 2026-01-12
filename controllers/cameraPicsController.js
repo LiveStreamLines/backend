@@ -13,16 +13,32 @@ function getCameraPictures (req, res) {
   const { developerId, projectId, cameraId } = req.params;
   const { date1, date2 } = req.body; // Optional date filters in the format YYYYMMDD
 
-  const cameraPath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
+  // Try optimized directory first, then fall back to large
+  const optimizedPath = path.join(mediaRoot, developerId, projectId, cameraId, 'optimized');
+  const largePath = path.join(mediaRoot, developerId, projectId, cameraId, 'large');
 
-  // Check if the camera directory exists
-  if (!fs.existsSync(cameraPath)) {
-    return res.json({ error: 'Camera directory not found' });
+  let files = [];
+  let cameraPath = null;
+
+  // Try to get files from optimized directory first
+  if (fs.existsSync(optimizedPath)) {
+    const optimizedFiles = fs.readdirSync(optimizedPath).filter(file => file.endsWith('.jpg'));
+    if (optimizedFiles.length > 0) {
+      files = optimizedFiles;
+      cameraPath = optimizedPath;
+    }
   }
 
-  // Read all image files in the camera directory
-  const files = fs.readdirSync(cameraPath).filter(file => file.endsWith('.jpg'));
+  // If no files in optimized, try large directory
+  if (files.length === 0 && fs.existsSync(largePath)) {
+    const largeFiles = fs.readdirSync(largePath).filter(file => file.endsWith('.jpg'));
+    if (largeFiles.length > 0) {
+      files = largeFiles;
+      cameraPath = largePath;
+    }
+  }
 
+  // Check if we found any files
   if (files.length === 0) {
     return res.json({ error: 'No pictures found in camera directory' });
   }
@@ -42,13 +58,17 @@ function getCameraPictures (req, res) {
   const date1Files = sortedFiles.filter(file => file.startsWith(dateFilter1));
   const date2Files = sortedFiles.filter(file => file.startsWith(dateFilter2));
 
+  // Determine which directory was used for the path
+  const directoryUsed = cameraPath === optimizedPath ? 'optimized' : 'large';
+
   // Respond with the first, last, date1, and date2 pictures
   res.json({
     firstPhoto: firstPic.replace('.jpg', ''), // Filename without extension
     lastPhoto: lastPic.replace('.jpg', ''), // Filename without extension
     date1Photos: date1Files.map(file => file.replace('.jpg', '')),
     date2Photos: date2Files.map(file => file.replace('.jpg', '')),
-    path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`
+    path: `${req.protocol}://${req.get('host')}/media/upload/${developerId}/${projectId}/${cameraId}/`,
+    directory: directoryUsed // Indicate which directory was used
   });
 }
 

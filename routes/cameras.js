@@ -92,6 +92,7 @@ router.get('/', cameraController.getAllCameras);
 router.get('/active', cameraController.getAllActiveCameras);
 router.get('/pics/last', cameraController.getLastPicturesFromAllCameras);
 router.get('/maintenance-cycle/start-date', cameraController.getMaintenanceCycleStartDate);
+router.get('/optimized/:developerTag/:projectTag/:cameraName', cameraController.checkCameraOptimized);
 router.get('/:id', cameraController.getCameraById);
 router.get('/proj/:id', cameraController.getCameraByProject);   
 router.get('/projtag/:tag', cameraController.getCameraByProjectTag);

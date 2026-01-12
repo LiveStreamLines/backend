@@ -814,6 +814,52 @@ async function deleteInternalAttachment(req, res) {
     }
 }
 
+// Check if a camera is optimized
+function checkCameraOptimized(req, res) {
+    try {
+        const { developerTag, projectTag, cameraName } = req.params;
+        
+        // Create camera identifier in format: developerTag-projectTag-cameraName
+        const cameraIdentifier = `${developerTag}-${projectTag}-${cameraName}`;
+        
+        // Path to optimized.json file
+        const optimizedFilePath = path.join(__dirname, '../data/optimized.json');
+        
+        // Check if file exists
+        if (!fs.existsSync(optimizedFilePath)) {
+            return res.json({ isOptimized: false });
+        }
+        
+        // Read and parse the optimized.json file
+        const fileContent = fs.readFileSync(optimizedFilePath, 'utf8');
+        let optimizedCameras = [];
+        
+        try {
+            optimizedCameras = JSON.parse(fileContent);
+        } catch (parseError) {
+            logger.error('Error parsing optimized.json:', parseError);
+            return res.json({ isOptimized: false });
+        }
+        
+        // Check if camera identifier is in the list
+        // Support both array format and object format
+        let isOptimized = false;
+        
+        if (Array.isArray(optimizedCameras)) {
+            isOptimized = optimizedCameras.includes(cameraIdentifier);
+        } else if (typeof optimizedCameras === 'object') {
+            // If it's an object, check if the key exists or if it's in a values array
+            isOptimized = optimizedCameras[cameraIdentifier] !== undefined || 
+                         Object.values(optimizedCameras).includes(cameraIdentifier);
+        }
+        
+        res.json({ isOptimized });
+    } catch (error) {
+        logger.error('Error checking if camera is optimized:', error);
+        res.status(500).json({ message: 'Failed to check camera optimization status', error: error.message });
+    }
+}
+
 module.exports = {
     getAllCameras,
     getAllActiveCameras,
@@ -835,5 +881,6 @@ module.exports = {
     getCameraAttachments,
     deleteCameraAttachment,
     uploadInternalAttachment,
-    deleteInternalAttachment
+    deleteInternalAttachment,
+    checkCameraOptimized
 };

@@ -816,6 +816,7 @@ async function deleteInternalAttachment(req, res) {
 
 module.exports = {
     getAllCameras,
+    getAllActiveCameras,
     getLastPicturesFromAllCameras,
     getCameraById,
     getCameraByProject,

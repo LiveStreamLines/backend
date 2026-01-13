@@ -869,9 +869,9 @@ async function generateVideoFromS3(req, res) {
             topText = '',               // Text to show in top middle
             logoPath = '',              // Path to logo image (right up corner) - optional if uploaded
             watermarkPath = '',        // Path to watermark image (middle) - optional if uploaded
-            brightness = 0.0,           // Brightness adjustment (-1.0 to 1.0)
-            contrast = 1.0,            // Contrast adjustment (0.0 to 3.0)
-            saturation = 1.0,           // Saturation adjustment (0.0 to 3.0)
+            brightness = '0.0',         // Brightness adjustment (-1.0 to 1.0) - string from frontend
+            contrast = '1.0',          // Contrast adjustment (0.0 to 3.0) - string from frontend
+            saturation = '1.0',         // Saturation adjustment (0.0 to 3.0) - string from frontend
             resolution = '720',         // '720' or '4K'
             speed = 'regular',          // 'fast', 'regular', or 'slow'
             imageSize = 'large'         // 'optimized' or 'large'
@@ -1217,6 +1217,11 @@ async function processVideoGenerationFromS3(params) {
                 imageFilename: path.basename(originalImage)
             });
             
+            // Log first image processing for debugging
+            if (i === 0) {
+                logger.info(`Processing first image with - Brightness: ${brightness}, Contrast: ${contrast}, Saturation: ${saturation}`);
+            }
+            
             processedImagePaths.push(processedImage);
             
             if ((i + 1) % 50 === 0) {
@@ -1386,7 +1391,30 @@ async function processSingleImage(params) {
         }
         
         // Apply brightness, contrast, saturation
-        filters.push(`[${currentLabel}]eq=contrast=${contrast}:brightness=${brightness}:saturation=${saturation}[final]`);
+        // Convert string values to numbers and ensure valid ranges
+        const brightnessVal = parseFloat(brightness);
+        const contrastVal = parseFloat(contrast);
+        const saturationVal = parseFloat(saturation);
+        
+        // Use defaults if parsing fails or values are invalid
+        const finalBrightness = isNaN(brightnessVal) ? 0.0 : brightnessVal;
+        const finalContrast = isNaN(contrastVal) ? 1.0 : contrastVal;
+        const finalSaturation = isNaN(saturationVal) ? 1.0 : saturationVal;
+        
+        // Clamp values to valid ranges
+        // Brightness: -1.0 (darkest) to 1.0 (brightest), 0.0 = neutral
+        const clampedBrightness = Math.max(-1.0, Math.min(1.0, finalBrightness));
+        // Contrast: 0.0 (no contrast) to 3.0 (high contrast), 1.0 = neutral
+        const clampedContrast = Math.max(0.0, Math.min(3.0, finalContrast));
+        // Saturation: 0.0 (grayscale) to 3.0 (high saturation), 1.0 = neutral
+        const clampedSaturation = Math.max(0.0, Math.min(3.0, finalSaturation));
+        
+        // Only log for first image to avoid spam
+        if (imageIndex === 0) {
+            logger.info(`Applying effects to image ${imageIndex} - Brightness: ${clampedBrightness} (raw: ${brightness}), Contrast: ${clampedContrast} (raw: ${contrast}), Saturation: ${clampedSaturation} (raw: ${saturation})`);
+        }
+        
+        filters.push(`[${currentLabel}]eq=contrast=${clampedContrast}:brightness=${clampedBrightness}:saturation=${clampedSaturation}[final]`);
         
         // Build ffmpeg command
         const ffmpegCommand = ffmpeg(inputImage);

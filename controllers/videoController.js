@@ -649,7 +649,58 @@ async function listS3Objects(prefix) {
 }
 
 /**
- * Filter images by date and time range from S3
+ * Read camera pics from JSON file (reused from cameraPicsControllerS3Test logic)
+ * @param {string} developerTag - Developer tag
+ * @param {string} projectTag - Project tag
+ * @param {string} cameraTag - Camera tag/name
+ * @returns {Promise<string[]>} Array of image filenames
+ */
+async function readCameraPicsFromFile(developerTag, projectTag, cameraTag) {
+    const CAMERA_PICS_DIR = path.join(__dirname, '../data/camerapics');
+    const fileName = `${developerTag}-${projectTag}-${cameraTag}.json`;
+    const filePath = path.join(CAMERA_PICS_DIR, fileName);
+    
+    try {
+        if (!fs.existsSync(filePath)) {
+            logger.warn(`Camera pics file not found: ${filePath}`);
+            return [];
+        }
+
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        
+        try {
+            const jsonData = JSON.parse(fileContent);
+            
+            // New format: object with images array
+            if (jsonData && typeof jsonData === 'object' && !Array.isArray(jsonData)) {
+                if (jsonData.images && Array.isArray(jsonData.images)) {
+                    return jsonData.images;
+                }
+            }
+            
+            // Old format: direct array
+            if (Array.isArray(jsonData)) {
+                return jsonData;
+            }
+        } catch (e) {
+            // If not JSON, try comma-separated string
+            const images = fileContent
+                .split(',')
+                .map(img => img.trim())
+                .filter(img => img.length > 0 && img.endsWith('.jpg'));
+            return images;
+        }
+        
+        return [];
+    } catch (error) {
+        logger.error(`Error reading camera pics file for ${developerTag}/${projectTag}/${cameraTag}:`, error);
+        return [];
+    }
+}
+
+/**
+ * Filter images by date and time range using getCameraPictures approach
+ * First tries to read from file, then falls back to S3
  * @param {string} developerId - Developer tag
  * @param {string} projectId - Project tag
  * @param {string} cameraId - Camera tag
@@ -672,7 +723,41 @@ async function filterS3ImagesByDateAndTime(developerId, projectId, cameraId, sta
     // S3 prefix path
     const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/${imageSize}/`;
     
-    // List all objects
+    // Try to read from camera pics JSON file first (same approach as getCameraPictures)
+    const images = await readCameraPicsFromFile(developerId, projectId, cameraId);
+    
+    if (images.length > 0) {
+        logger.info(`Reading camera pics from file: ${developerId}-${projectId}-${cameraId}`);
+        
+        // Filter images by date and time range
+        const filtered = images
+            .map(img => img.replace('.jpg', ''))
+            .filter(timestamp => {
+                // Extract date (YYYYMMDD) and hour (HH) from timestamp (format: YYYYMMDDHHmmss)
+                if (timestamp.length < 10) return false;
+                
+                const imageDate = timestamp.substring(0, 8); // YYYYMMDD
+                const imageHour = timestamp.substring(8, 10); // HH
+                
+                // Check date range
+                const dateInRange = imageDate >= startDateStr && imageDate <= endDateStr;
+                
+                // Check time range
+                const timeInRange = imageHour >= startTimeStr && imageHour <= endTimeStr;
+                
+                return dateInRange && timeInRange;
+            })
+            .sort();
+        
+        // Convert to S3 keys
+        const s3Keys = filtered.map(timestamp => `${s3Prefix}${timestamp}.jpg`);
+        return s3Keys;
+    }
+    
+    // Fallback to S3 if file doesn't exist (same as getCameraPictures)
+    logger.warn(`Camera pics file not found: ${developerId}-${projectId}-${cameraId}, falling back to S3`);
+    
+    // List all objects from S3
     const objectKeys = await listS3Objects(s3Prefix);
     
     // Filter only .jpg files

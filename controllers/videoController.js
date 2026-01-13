@@ -851,6 +851,11 @@ function calculateEstimatedVideoTime(imageCount, speed) {
  * Generate video from S3 images with all parameters
  */
 async function generateVideoFromS3(req, res) {
+    // Set CORS headers explicitly
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
     try {
         const {
             developerId,
@@ -882,6 +887,9 @@ async function generateVideoFromS3(req, res) {
         
         // Validate required parameters
         if (!developerId || !projectId || !cameraId || !startDate || !endDate || !startTime || !endTime) {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
             return res.status(400).json({
                 error: 'Missing required parameters: developerId, projectId, cameraId, startDate, endDate, startTime, endTime'
             });
@@ -1087,6 +1095,11 @@ async function generateVideoFromS3(req, res) {
                     logger.error('Error cleaning up temp folder:', cleanupError);
                 }
                 
+                // Ensure CORS headers are set before sending success response
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                
                 // Return success response
                 res.json({
                     success: true,
@@ -1121,6 +1134,10 @@ async function generateVideoFromS3(req, res) {
                     logger.error('Error cleaning up temp folder:', cleanupError);
                 }
                 
+                // Ensure CORS headers are set before sending error response
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
                 res.status(500).json({
                     error: 'Failed to generate video',
                     message: err.message
@@ -1130,6 +1147,10 @@ async function generateVideoFromS3(req, res) {
             
     } catch (error) {
         logger.error('Error in generateVideoFromS3:', error);
+        // Ensure CORS headers are set before sending error response
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         res.status(500).json({
             error: 'Failed to generate video',
             message: error.message

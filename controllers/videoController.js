@@ -1159,8 +1159,10 @@ async function processVideoGenerationFromS3(params) {
     
     try {
         // Step 1: Download images to temporary folder
+        // Use /var/media as base path if MEDIA_PATH is not set
+        const mediaBasePath = process.env.MEDIA_PATH || '/var/media';
         const tempFolder = path.join(
-            process.env.MEDIA_PATH || './media',
+            mediaBasePath,
             'upload',
             developerId,
             projectId,
@@ -1179,9 +1181,54 @@ async function processVideoGenerationFromS3(params) {
         
         logger.info(`Downloaded ${localImagePaths.length} images`);
         
-        // Step 2: Prepare output video path
+        // Step 2: Process each image individually
+        const processedImagesFolder = path.join(tempFolder, 'processed');
+        if (!fs.existsSync(processedImagesFolder)) {
+            fs.mkdirSync(processedImagesFolder, { recursive: true });
+        }
+        
+        logger.info(`Processing ${localImagePaths.length} images individually...`);
+        
+        // Configure resolution
+        const resolutionMap = {
+            '720': { width: 1280, height: 720 },
+            '4K': { width: 3840, height: 2160 }
+        };
+        const selectedResolution = resolutionMap[resolution] || resolutionMap['720'];
+        
+        // Process each image
+        const processedImagePaths = [];
+        for (let i = 0; i < localImagePaths.length; i++) {
+            const originalImage = localImagePaths[i];
+            const processedImage = path.join(processedImagesFolder, `processed_${String(i + 1).padStart(6, '0')}.jpg`);
+            
+            await processSingleImage({
+                inputImage: originalImage,
+                outputImage: processedImage,
+                resolution: selectedResolution,
+                logoPath: finalLogoPath,
+                watermarkPath: finalWatermarkPath,
+                showDate: showDate,
+                topText: topText,
+                brightness: brightness,
+                contrast: contrast,
+                saturation: saturation,
+                imageIndex: i,
+                imageFilename: path.basename(originalImage)
+            });
+            
+            processedImagePaths.push(processedImage);
+            
+            if ((i + 1) % 50 === 0) {
+                logger.info(`Processed ${i + 1}/${localImagePaths.length} images...`);
+            }
+        }
+        
+        logger.info(`All ${processedImagePaths.length} images processed`);
+        
+        // Step 3: Prepare output video path
         const videoFolder = path.join(
-            process.env.MEDIA_PATH || './media',
+            mediaBasePath,
             'upload',
             developerId,
             projectId,
@@ -1196,19 +1243,12 @@ async function processVideoGenerationFromS3(params) {
         const videoId = generateCustomId();
         const outputVideoPath = path.join(videoFolder, `video_s3_${videoId}.mp4`);
         
-        // Step 3: Create image list file for ffmpeg
+        // Step 4: Create image list file for simple video generation
         const listFilePath = path.join(tempFolder, 'image_list.txt');
-        const fileListContent = localImagePaths
+        const fileListContent = processedImagePaths
             .map(file => `file '${file.replace(/\\/g, '/')}'`)
             .join('\n');
         fs.writeFileSync(listFilePath, fileListContent);
-        
-        // Step 4: Configure resolution
-        const resolutionMap = {
-            '720': { width: 1280, height: 720 },
-            '4K': { width: 3840, height: 2160 }
-        };
-        const selectedResolution = resolutionMap[resolution] || resolutionMap['720'];
         
         // Step 5: Configure frame rate based on speed
         const frameRates = {
@@ -1218,100 +1258,21 @@ async function processVideoGenerationFromS3(params) {
         };
         const fps = frameRates[speed] || frameRates['regular'];
         
-        // Step 6: Build ffmpeg command with all filters
-        const ffmpegCommand = ffmpeg()
-            .input(listFilePath)
-            .inputOptions(['-f concat', '-safe 0', `-r ${fps}`]);
-        
-        const drawtextFilters = [];
-        let inputIndex = 0;
-        
-        // Scale to resolution
-        const resolutionFilter = `[0:v]scale=${selectedResolution.width}:${selectedResolution.height}[scaled]`;
-        drawtextFilters.push(resolutionFilter);
-        let baseLabel = 'scaled';
-        
-        // Add logo (right up corner) if provided
-        if (finalLogoPath && fs.existsSync(finalLogoPath)) {
-            const logoPathNormalized = finalLogoPath.replace(/\\/g, '/');
-            ffmpegCommand.input(logoPathNormalized);
-            drawtextFilters.push(`[${++inputIndex}:v]scale=200:-1[logo]`);
-            drawtextFilters.push(`[${baseLabel}][logo]overlay=W-w-10:10[with_logo]`);
-            baseLabel = 'with_logo';
-        }
-        
-        // Add watermark (middle) if provided
-        if (finalWatermarkPath && fs.existsSync(finalWatermarkPath)) {
-            const watermarkPathNormalized = finalWatermarkPath.replace(/\\/g, '/');
-            ffmpegCommand.input(watermarkPathNormalized);
-            drawtextFilters.push(`[${++inputIndex}:v]format=rgba,colorchannelmixer=aa=0.2[watermark]`);
-            drawtextFilters.push(`[${baseLabel}][watermark]overlay=W/2-w/2:H/2-h/2[with_watermark]`);
-            baseLabel = 'with_watermark';
-        }
-        
-        // Build text filters for date and top text
-        let textFilters = [];
-        
-        // Add date/time overlay if enabled
-        if (showDate === true || showDate === 'true') {
-            // Create date filters for each frame
-            const dateFilters = localImagePaths.map((file, index) => {
-                const filename = path.basename(file);
-                // Extract timestamp from filename (format: 000001_YYYYMMDDHHmmss.jpg)
-                const timestampMatch = filename.match(/\d{14}/);
-                if (timestampMatch) {
-                    const timestamp = timestampMatch[0];
-                    const dateStr = timestamp.substring(0, 8);
-                    const timeStr = timestamp.substring(8, 14);
-                    const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-                    const formattedTime = `${timeStr.substring(0, 2)}:${timeStr.substring(2, 4)}:${timeStr.substring(4, 6)}`;
-                    // Escape single quotes in text
-                    const escapedText = `${formattedDate} ${formattedTime}`.replace(/'/g, "\\'");
-                    return `drawtext=text='${escapedText}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
-                }
-                return '';
-            }).filter(f => f.length > 0);
-            
-            textFilters = textFilters.concat(dateFilters);
-        }
-        
-        // Add top text if provided (position it below date if date is shown, or at top if not)
-        if (topText && topText.trim()) {
-            const escapedText = topText.replace(/'/g, "\\'");
-            // Position top text in center, adjust y position based on whether date is shown
-            const yPosition = (showDate === true || showDate === 'true') ? 80 : 10;
-            textFilters.push(`drawtext=text='${escapedText}':x=(w-text_w)/2:y=${yPosition}:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5`);
-        }
-        
-        // Apply all text filters
-        if (textFilters.length > 0) {
-            drawtextFilters.push(`[${baseLabel}]${textFilters.join(',')}[with_text]`);
-            baseLabel = 'with_text';
-        }
-        
-        // Apply brightness, contrast, saturation
-        const effectsFilter = `[${baseLabel}]eq=contrast=${contrast}:brightness=${brightness}:saturation=${saturation}[final]`;
-        drawtextFilters.push(effectsFilter);
-        
-        // Apply filter complex
-        if (drawtextFilters.length > 0) {
-            ffmpegCommand.addOption('-filter_complex', drawtextFilters.join(';'));
-            ffmpegCommand.map('[final]');
-        }
-        
-        // Step 7: Generate video
+        // Step 6: Generate video with simple command (just framerate - images already processed)
+        logger.info(`Generating video from ${processedImagePaths.length} processed images...`);
         await new Promise((resolve, reject) => {
-            ffmpegCommand
+            ffmpeg()
+                .input(listFilePath)
+                .inputOptions(['-f concat', '-safe 0', `-r ${fps}`])
                 .outputOptions([
-                    `-r ${fps}`,
                     '-c:v libx264',
-                    '-preset slow',
-                    '-crf 18',
+                    '-preset medium',
+                    '-crf 23',
                     '-pix_fmt yuv420p'
                 ])
                 .output(outputVideoPath)
                 .on('start', (command) => {
-                    logger.info('FFmpeg command:', command);
+                    logger.info('FFmpeg video generation command:', command);
                 })
                 .on('progress', (progress) => {
                     logger.info(`Video generation progress: ${progress.percent || 0}%`);
@@ -1323,7 +1284,7 @@ async function processVideoGenerationFromS3(params) {
                     const stats = fs.statSync(outputVideoPath);
                     const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
                     
-                    logger.info(`Video generated: ${outputVideoPath}, Size: ${fileSizeMB} MB`);
+                    logger.info(`Video generated: ${outputVideoPath}, Size: ${fileSizeMB} MB, Video ID: ${videoId}`);
                     resolve();
                 })
                 .on('error', (err) => {
@@ -1352,6 +1313,108 @@ async function processVideoGenerationFromS3(params) {
     } catch (error) {
         logger.error('Error in processVideoGenerationFromS3:', error);
     }
+}
+
+/**
+ * Process a single image with all overlays and effects
+ * @param {Object} params - Processing parameters
+ */
+async function processSingleImage(params) {
+    const {
+        inputImage,
+        outputImage,
+        resolution,
+        logoPath,
+        watermarkPath,
+        showDate,
+        topText,
+        brightness,
+        contrast,
+        saturation,
+        imageIndex,
+        imageFilename
+    } = params;
+    
+    return new Promise((resolve, reject) => {
+        const filters = [];
+        let inputIndex = 0;
+        
+        // Start with scale to resolution
+        filters.push(`[0:v]scale=${resolution.width}:${resolution.height}[scaled]`);
+        let currentLabel = 'scaled';
+        
+        // Add logo overlay if provided
+        if (logoPath && fs.existsSync(logoPath)) {
+            const logoPathNormalized = logoPath.replace(/\\/g, '/');
+            filters.push(`[${++inputIndex}:v]scale=200:-1[logo]`);
+            filters.push(`[${currentLabel}][logo]overlay=W-w-10:10[with_logo]`);
+            currentLabel = 'with_logo';
+        }
+        
+        // Add watermark overlay if provided
+        if (watermarkPath && fs.existsSync(watermarkPath)) {
+            const watermarkPathNormalized = watermarkPath.replace(/\\/g, '/');
+            filters.push(`[${++inputIndex}:v]format=rgba,colorchannelmixer=aa=0.2[watermark]`);
+            filters.push(`[${currentLabel}][watermark]overlay=W/2-w/2:H/2-h/2[with_watermark]`);
+            currentLabel = 'with_watermark';
+        }
+        
+        // Add date/time text if enabled
+        if (showDate === true || showDate === 'true') {
+            const filename = imageFilename;
+            const timestampMatch = filename.match(/\d{14}/);
+            if (timestampMatch) {
+                const timestamp = timestampMatch[0];
+                const dateStr = timestamp.substring(0, 8);
+                const timeStr = timestamp.substring(8, 14);
+                const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                const formattedTime = `${timeStr.substring(0, 2)}:${timeStr.substring(2, 4)}:${timeStr.substring(4, 6)}`;
+                const dateText = `${formattedDate} ${formattedTime}`;
+                // Escape special characters
+                const escapedDateText = dateText.replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/=/g, '\\=');
+                filters.push(`[${currentLabel}]drawtext=text='${escapedDateText}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5[with_date]`);
+                currentLabel = 'with_date';
+            }
+        }
+        
+        // Add top text if provided
+        if (topText && topText.trim()) {
+            const escapedText = topText.replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/=/g, '\\=');
+            const yPosition = (showDate === true || showDate === 'true') ? 80 : 10;
+            filters.push(`[${currentLabel}]drawtext=text='${escapedText}':x=(w-text_w)/2:y=${yPosition}:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5[with_text]`);
+            currentLabel = 'with_text';
+        }
+        
+        // Apply brightness, contrast, saturation
+        filters.push(`[${currentLabel}]eq=contrast=${contrast}:brightness=${brightness}:saturation=${saturation}[final]`);
+        
+        // Build ffmpeg command
+        const ffmpegCommand = ffmpeg(inputImage);
+        
+        // Add logo and watermark as inputs if needed
+        if (logoPath && fs.existsSync(logoPath)) {
+            ffmpegCommand.input(logoPath.replace(/\\/g, '/'));
+        }
+        if (watermarkPath && fs.existsSync(watermarkPath)) {
+            ffmpegCommand.input(watermarkPath.replace(/\\/g, '/'));
+        }
+        
+        // Apply filter complex
+        const filterComplex = filters.join(';');
+        ffmpegCommand
+            .addOption('-filter_complex', filterComplex)
+            .map('[final]')
+            .outputOptions(['-frames:v', '1']) // Output single frame
+            .output(outputImage)
+            .on('end', () => {
+                resolve();
+            })
+            .on('error', (err) => {
+                logger.error(`Error processing image ${inputImage}:`, err);
+                reject(err);
+            })
+            .run();
+    });
 }
 
 module.exports = {

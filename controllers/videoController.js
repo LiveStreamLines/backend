@@ -8,6 +8,9 @@ const photoRequestData = require('../models/photoRequestData');
 const developerData = require('../models/developerData');
 const projectData = require('../models/projectData');
 const logger = require('../logger');
+const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { createWriteStream } = require('fs');
+const { pipeline } = require('stream/promises');
 
 
 const mediaRoot = process.env.MEDIA_PATH + '/upload';
@@ -598,11 +601,463 @@ function getAllPhotoRequest(req, res) {
   })));
 }
 
+// S3 Configuration for Camera Pictures (same as cameraPicsControllerS3Test)
+const S3_CONFIG = {
+    endpoint: process.env.S3_CAMERA_ENDPOINT || 'https://s3.ap-southeast-1.idrivee2.com',
+    region: process.env.S3_CAMERA_REGION || 'ap-southeast-1',
+    credentials: {
+        accessKeyId: process.env.S3_CAMERA_ACCESS_KEY_ID || 'fMZXDwBL2hElR6rEzgCW',
+        secretAccessKey: process.env.S3_CAMERA_SECRET_ACCESS_KEY || 'gXrfsUVEDttGQBv3GIfjZvokZ4qrAFsOUywiN4TD'
+    },
+    forcePathStyle: true,
+    signatureVersion: 'v4'
+};
+
+const s3Client = new S3Client(S3_CONFIG);
+const CAMERA_BUCKET_NAME = process.env.S3_CAMERA_BUCKET_NAME || process.env.S3_BUCKET_NAME || 'camera-pictures';
+
+/**
+ * List all objects in S3 with the given prefix
+ */
+async function listS3Objects(prefix) {
+    try {
+        const objects = [];
+        let continuationToken = undefined;
+
+        do {
+            const command = new ListObjectsV2Command({
+                Bucket: CAMERA_BUCKET_NAME,
+                Prefix: prefix,
+                ContinuationToken: continuationToken,
+                MaxKeys: 1000
+            });
+
+            const response = await s3Client.send(command);
+            
+            if (response.Contents) {
+                objects.push(...response.Contents.map(obj => obj.Key));
+            }
+
+            continuationToken = response.NextContinuationToken;
+        } while (continuationToken);
+
+        return objects;
+    } catch (error) {
+        logger.error('Error listing S3 objects:', error);
+        throw new Error(`Failed to list objects from S3: ${error.message}`);
+    }
+}
+
+/**
+ * Filter images by date and time range from S3
+ * @param {string} developerId - Developer tag
+ * @param {string} projectId - Project tag
+ * @param {string} cameraId - Camera tag
+ * @param {string} startDate - Start date in YYYY-MM-DD format
+ * @param {string} endDate - End date in YYYY-MM-DD format
+ * @param {string} startTime - Start time in HH format (00-23)
+ * @param {string} endTime - End time in HH format (00-23)
+ * @param {string} imageSize - 'optimized' or 'large'
+ * @returns {Promise<string[]>} Array of S3 keys for filtered images
+ */
+async function filterS3ImagesByDateAndTime(developerId, projectId, cameraId, startDate, endDate, startTime, endTime, imageSize = 'large') {
+    // Convert dates from YYYY-MM-DD to YYYYMMDD
+    const startDateStr = startDate.replace(/-/g, '');
+    const endDateStr = endDate.replace(/-/g, '');
+    
+    // Convert time from HH to HH format (pad with 0)
+    const startTimeStr = String(startTime).padStart(2, '0');
+    const endTimeStr = String(endTime).padStart(2, '0');
+    
+    // S3 prefix path
+    const s3Prefix = `upload/${developerId}/${projectId}/${cameraId}/${imageSize}/`;
+    
+    // List all objects
+    const objectKeys = await listS3Objects(s3Prefix);
+    
+    // Filter only .jpg files
+    const jpgKeys = objectKeys.filter(key => key.endsWith('.jpg'));
+    
+    // Filter by date and time range
+    const filteredKeys = jpgKeys.filter(key => {
+        const filename = path.basename(key, '.jpg');
+        
+        // Extract date (YYYYMMDD) and hour (HH) from filename (format: YYYYMMDDHHmmss)
+        if (filename.length < 10) return false;
+        
+        const fileDate = filename.substring(0, 8); // YYYYMMDD
+        const fileHour = filename.substring(8, 10); // HH
+        
+        // Check date range
+        const dateInRange = fileDate >= startDateStr && fileDate <= endDateStr;
+        
+        // Check time range
+        const timeInRange = fileHour >= startTimeStr && fileHour <= endTimeStr;
+        
+        return dateInRange && timeInRange;
+    });
+    
+    // Sort by filename (which is timestamp)
+    filteredKeys.sort();
+    
+    return filteredKeys;
+}
+
+/**
+ * Download images from S3 to local folder
+ * @param {string[]} s3Keys - Array of S3 keys
+ * @param {string} localFolder - Local folder path to save images
+ * @returns {Promise<string[]>} Array of local file paths
+ */
+async function downloadImagesFromS3(s3Keys, localFolder) {
+    // Ensure folder exists
+    if (!fs.existsSync(localFolder)) {
+        fs.mkdirSync(localFolder, { recursive: true });
+    }
+    
+    const localPaths = [];
+    
+    for (let i = 0; i < s3Keys.length; i++) {
+        const s3Key = s3Keys[i];
+        const filename = path.basename(s3Key);
+        const localPath = path.join(localFolder, `${String(i + 1).padStart(6, '0')}_${filename}`);
+        
+        try {
+            const getObjectCommand = new GetObjectCommand({
+                Bucket: CAMERA_BUCKET_NAME,
+                Key: s3Key
+            });
+            
+            const response = await s3Client.send(getObjectCommand);
+            const writeStream = createWriteStream(localPath);
+            await pipeline(response.Body, writeStream);
+            
+            localPaths.push(localPath);
+        } catch (error) {
+            logger.error(`Error downloading ${s3Key}:`, error);
+            // Continue with other images
+        }
+    }
+    
+    return localPaths;
+}
+
+/**
+ * Calculate estimated video time based on number of images and speed
+ * @param {number} imageCount - Number of images
+ * @param {string} speed - 'fast', 'regular', or 'slow'
+ * @returns {number} Estimated video duration in seconds
+ */
+function calculateEstimatedVideoTime(imageCount, speed) {
+    // Frame rates for different speeds
+    const frameRates = {
+        'fast': 30,    // 30 fps - faster playback
+        'regular': 15, // 15 fps - normal playback
+        'slow': 5      // 5 fps - slower playback
+    };
+    
+    const fps = frameRates[speed] || frameRates['regular'];
+    const duration = imageCount / fps;
+    
+    return Math.round(duration);
+}
+
+/**
+ * Generate video from S3 images with all parameters
+ */
+async function generateVideoFromS3(req, res) {
+    try {
+        const {
+            developerId,
+            projectId,
+            cameraId,
+            startDate,      // YYYY-MM-DD format
+            endDate,        // YYYY-MM-DD format
+            startTime,      // HH format (00-23)
+            endTime,        // HH format (00-23)
+            showDate = false,           // boolean or 'true'/'false' string
+            topText = '',               // Text to show in top middle
+            logoPath = '',              // Path to logo image (right up corner) - optional if uploaded
+            watermarkPath = '',        // Path to watermark image (middle) - optional if uploaded
+            brightness = 0.0,           // Brightness adjustment (-1.0 to 1.0)
+            contrast = 1.0,            // Contrast adjustment (0.0 to 3.0)
+            saturation = 1.0,           // Saturation adjustment (0.0 to 3.0)
+            resolution = '720',         // '720' or '4K'
+            speed = 'regular',          // 'fast', 'regular', or 'slow'
+            imageSize = 'large'         // 'optimized' or 'large'
+        } = req.body;
+        
+        // Get uploaded files if any
+        const logoFile = req.files?.logo ? req.files.logo[0].path : null;
+        const watermarkFile = req.files?.watermark ? req.files.watermark[0].path : null;
+        
+        // Use uploaded files if available, otherwise use provided paths
+        const finalLogoPath = logoFile || logoPath;
+        const finalWatermarkPath = watermarkFile || watermarkPath;
+        
+        // Validate required parameters
+        if (!developerId || !projectId || !cameraId || !startDate || !endDate || !startTime || !endTime) {
+            return res.status(400).json({
+                error: 'Missing required parameters: developerId, projectId, cameraId, startDate, endDate, startTime, endTime'
+            });
+        }
+        
+        logger.info(`Generating video from S3: ${developerId}/${projectId}/${cameraId} from ${startDate} ${startTime}:00 to ${endDate} ${endTime}:00`);
+        
+        // Step 1: Filter images from S3
+        const s3Keys = await filterS3ImagesByDateAndTime(
+            developerId, projectId, cameraId, 
+            startDate, endDate, startTime, endTime, imageSize
+        );
+        
+        if (s3Keys.length === 0) {
+            return res.status(404).json({
+                error: 'No images found for the specified date and time range'
+            });
+        }
+        
+        logger.info(`Found ${s3Keys.length} images matching criteria`);
+        
+        // Step 2: Calculate estimated video time
+        const estimatedDuration = calculateEstimatedVideoTime(s3Keys.length, speed);
+        
+        // Step 3: Download images to temporary folder
+        const tempFolder = path.join(
+            process.env.MEDIA_PATH || './media',
+            'upload',
+            developerId,
+            projectId,
+            cameraId,
+            'temp_video',
+            `video_${Date.now()}`
+        );
+        
+        logger.info(`Downloading ${s3Keys.length} images to ${tempFolder}`);
+        const localImagePaths = await downloadImagesFromS3(s3Keys, tempFolder);
+        
+        if (localImagePaths.length === 0) {
+            return res.status(500).json({
+                error: 'Failed to download images from S3'
+            });
+        }
+        
+        logger.info(`Downloaded ${localImagePaths.length} images`);
+        
+        // Step 4: Prepare output video path
+        const videoFolder = path.join(
+            process.env.MEDIA_PATH || './media',
+            'upload',
+            developerId,
+            projectId,
+            cameraId,
+            'videos'
+        );
+        
+        if (!fs.existsSync(videoFolder)) {
+            fs.mkdirSync(videoFolder, { recursive: true });
+        }
+        
+        const videoId = generateCustomId();
+        const outputVideoPath = path.join(videoFolder, `video_s3_${videoId}.mp4`);
+        
+        // Step 5: Create image list file for ffmpeg
+        const listFilePath = path.join(tempFolder, 'image_list.txt');
+        const fileListContent = localImagePaths
+            .map(file => `file '${file.replace(/\\/g, '/')}'`)
+            .join('\n');
+        fs.writeFileSync(listFilePath, fileListContent);
+        
+        // Step 6: Configure resolution
+        const resolutionMap = {
+            '720': { width: 1280, height: 720 },
+            '4K': { width: 3840, height: 2160 }
+        };
+        const selectedResolution = resolutionMap[resolution] || resolutionMap['720'];
+        
+        // Step 7: Configure frame rate based on speed
+        const frameRates = {
+            'fast': 30,
+            'regular': 15,
+            'slow': 5
+        };
+        const fps = frameRates[speed] || frameRates['regular'];
+        
+        // Step 8: Build ffmpeg command with all filters
+        const ffmpegCommand = ffmpeg()
+            .input(listFilePath)
+            .inputOptions(['-f concat', '-safe 0', `-r ${fps}`]);
+        
+        const drawtextFilters = [];
+        let inputIndex = 0;
+        
+        // Scale to resolution
+        const resolutionFilter = `[0:v]scale=${selectedResolution.width}:${selectedResolution.height}[scaled]`;
+        drawtextFilters.push(resolutionFilter);
+        let baseLabel = 'scaled';
+        
+        // Add logo (right up corner) if provided
+        if (finalLogoPath && fs.existsSync(finalLogoPath)) {
+            const logoPathNormalized = finalLogoPath.replace(/\\/g, '/');
+            ffmpegCommand.input(logoPathNormalized);
+            drawtextFilters.push(`[${++inputIndex}:v]scale=200:-1[logo]`);
+            drawtextFilters.push(`[${baseLabel}][logo]overlay=W-w-10:10[with_logo]`);
+            baseLabel = 'with_logo';
+        }
+        
+        // Add watermark (middle) if provided
+        if (finalWatermarkPath && fs.existsSync(finalWatermarkPath)) {
+            const watermarkPathNormalized = finalWatermarkPath.replace(/\\/g, '/');
+            ffmpegCommand.input(watermarkPathNormalized);
+            drawtextFilters.push(`[${++inputIndex}:v]format=rgba,colorchannelmixer=aa=0.2[watermark]`);
+            drawtextFilters.push(`[${baseLabel}][watermark]overlay=W/2-w/2:H/2-h/2[with_watermark]`);
+            baseLabel = 'with_watermark';
+        }
+        
+        // Build text filters for date and top text
+        let textFilters = [];
+        
+        // Add date/time overlay if enabled
+        if (showDate === true || showDate === 'true') {
+            // Create date filters for each frame
+            const dateFilters = localImagePaths.map((file, index) => {
+                const filename = path.basename(file);
+                // Extract timestamp from filename (format: 000001_YYYYMMDDHHmmss.jpg)
+                const timestampMatch = filename.match(/\d{14}/);
+                if (timestampMatch) {
+                    const timestamp = timestampMatch[0];
+                    const dateStr = timestamp.substring(0, 8);
+                    const timeStr = timestamp.substring(8, 14);
+                    const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                    const formattedTime = `${timeStr.substring(0, 2)}:${timeStr.substring(2, 4)}:${timeStr.substring(4, 6)}`;
+                    // Escape single quotes in text
+                    const escapedText = `${formattedDate} ${formattedTime}`.replace(/'/g, "\\'");
+                    return `drawtext=text='${escapedText}':x=10:y=10:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5:enable='between(n,${index},${index})'`;
+                }
+                return '';
+            }).filter(f => f.length > 0);
+            
+            textFilters = textFilters.concat(dateFilters);
+        }
+        
+        // Add top text if provided (position it below date if date is shown, or at top if not)
+        if (topText && topText.trim()) {
+            const escapedText = topText.replace(/'/g, "\\'");
+            // Position top text in center, adjust y position based on whether date is shown
+            const yPosition = (showDate === true || showDate === 'true') ? 80 : 10;
+            textFilters.push(`drawtext=text='${escapedText}':x=(w-text_w)/2:y=${yPosition}:fontsize=60:fontcolor=white:box=1:boxcolor=black@0.5`);
+        }
+        
+        // Apply all text filters
+        if (textFilters.length > 0) {
+            drawtextFilters.push(`[${baseLabel}]${textFilters.join(',')}[with_text]`);
+            baseLabel = 'with_text';
+        }
+        
+        // Apply brightness, contrast, saturation
+        const effectsFilter = `[${baseLabel}]eq=contrast=${contrast}:brightness=${brightness}:saturation=${saturation}[final]`;
+        drawtextFilters.push(effectsFilter);
+        
+        // Apply filter complex
+        if (drawtextFilters.length > 0) {
+            ffmpegCommand.addOption('-filter_complex', drawtextFilters.join(';'));
+            ffmpegCommand.map('[final]');
+        }
+        
+        // Step 9: Generate video
+        ffmpegCommand
+            .outputOptions([
+                `-r ${fps}`,
+                '-c:v libx264',
+                '-preset slow',
+                '-crf 18',
+                '-pix_fmt yuv420p'
+            ])
+            .output(outputVideoPath)
+            .on('start', (command) => {
+                logger.info('FFmpeg command:', command);
+            })
+            .on('progress', (progress) => {
+                logger.info(`Video generation progress: ${progress.percent || 0}%`);
+            })
+            .on('end', () => {
+                logger.info('Video generation completed');
+                
+                // Get video file size
+                const stats = fs.statSync(outputVideoPath);
+                const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+                
+                // Clean up temporary folder and uploaded files
+                try {
+                    fs.rmSync(tempFolder, { recursive: true, force: true });
+                    logger.info(`Cleaned up temporary folder: ${tempFolder}`);
+                    
+                    // Clean up uploaded logo and watermark files
+                    if (logoFile && fs.existsSync(logoFile)) {
+                        fs.unlinkSync(logoFile);
+                    }
+                    if (watermarkFile && fs.existsSync(watermarkFile)) {
+                        fs.unlinkSync(watermarkFile);
+                    }
+                } catch (cleanupError) {
+                    logger.error('Error cleaning up temp folder:', cleanupError);
+                }
+                
+                // Return success response
+                res.json({
+                    success: true,
+                    message: 'Video generated successfully',
+                    videoId: videoId,
+                    videoPath: `/media/upload/${developerId}/${projectId}/${cameraId}/videos/video_s3_${videoId}.mp4`,
+                    imageCount: localImagePaths.length,
+                    estimatedDuration: estimatedDuration,
+                    actualDuration: estimatedDuration, // Could be calculated from video metadata
+                    fileSize: `${fileSizeMB} MB`,
+                    resolution: resolution,
+                    speed: speed,
+                    fps: fps
+                });
+            })
+            .on('error', (err) => {
+                logger.error('Error generating video:', err);
+                
+                // Clean up on error
+                try {
+                    if (fs.existsSync(tempFolder)) {
+                        fs.rmSync(tempFolder, { recursive: true, force: true });
+                    }
+                    // Clean up uploaded files on error
+                    if (logoFile && fs.existsSync(logoFile)) {
+                        fs.unlinkSync(logoFile);
+                    }
+                    if (watermarkFile && fs.existsSync(watermarkFile)) {
+                        fs.unlinkSync(watermarkFile);
+                    }
+                } catch (cleanupError) {
+                    logger.error('Error cleaning up temp folder:', cleanupError);
+                }
+                
+                res.status(500).json({
+                    error: 'Failed to generate video',
+                    message: err.message
+                });
+            })
+            .run();
+            
+    } catch (error) {
+        logger.error('Error in generateVideoFromS3:', error);
+        res.status(500).json({
+            error: 'Failed to generate video',
+            message: error.message
+        });
+    }
+}
+
 module.exports = {
   generateVideoRequest,
   generatePhotoRequest,
   getAllVideoRequest,
   getVideoRequestbyDeveloper,
   getAllPhotoRequest,
-  deleteVideoRequest
+  deleteVideoRequest,
+  generateVideoFromS3
 };

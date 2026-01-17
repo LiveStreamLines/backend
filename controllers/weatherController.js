@@ -42,12 +42,102 @@ function convertGMTtoGMT4(gmtTimestamp) {
 }
 
 /**
- * Determine if weather is sunny or cloudy based on icon
- * wx_icon values: Clear/sunny typically < 10, cloudy typically >= 20
+ * Determine weather status from weather.com API response
+ * Returns: 'sunny', 'cloudy', 'partly-cloudy', 'rainy', 'snowy', 'foggy', 'stormy', or 'unknown'
  */
-function isSunny(wxIcon) {
-    // Icons 1-4 are typically clear/sunny, 20+ are cloudy
-    return wxIcon < 10;
+function getWeatherStatus(obs) {
+    const wxPhrase = (obs.wx_phrase || '').toLowerCase();
+    const wxIcon = obs.wx_icon || obs.icon_extd || 0;
+    const clds = (obs.clds || '').toUpperCase();
+    
+    // Check wx_phrase first (most reliable)
+    if (wxPhrase.includes('clear') || wxPhrase.includes('fair') || wxPhrase.includes('sunny')) {
+        return 'sunny';
+    }
+    
+    if (wxPhrase.includes('cloudy') || wxPhrase.includes('overcast')) {
+        // Check if it's partly cloudy
+        if (wxPhrase.includes('partly') || wxPhrase.includes('partially') || wxPhrase.includes('scattered')) {
+            return 'partly-cloudy';
+        }
+        return 'cloudy';
+    }
+    
+    if (wxPhrase.includes('rain') || wxPhrase.includes('shower') || wxPhrase.includes('drizzle')) {
+        return 'rainy';
+    }
+    
+    if (wxPhrase.includes('snow') || wxPhrase.includes('sleet')) {
+        return 'snowy';
+    }
+    
+    if (wxPhrase.includes('fog') || wxPhrase.includes('mist') || wxPhrase.includes('haze')) {
+        return 'foggy';
+    }
+    
+    if (wxPhrase.includes('thunder') || wxPhrase.includes('storm')) {
+        return 'stormy';
+    }
+    
+    // Fallback to icon codes if phrase is not available
+    // Weather.com icon codes:
+    // 1-4: Clear/Sunny
+    // 5-6: Mostly Clear
+    // 7-8: Partly Cloudy
+    // 11-12: Mostly Cloudy
+    // 13-14: Cloudy
+    // 15-18: Rainy
+    // 19-20: Stormy
+    // 22-23: Snowy
+    // 24-25: Foggy
+    
+    if (wxIcon >= 1 && wxIcon <= 4) {
+        return 'sunny';
+    }
+    
+    if (wxIcon >= 5 && wxIcon <= 6) {
+        return 'partly-cloudy';
+    }
+    
+    if (wxIcon >= 7 && wxIcon <= 8) {
+        return 'partly-cloudy';
+    }
+    
+    if (wxIcon >= 11 && wxIcon <= 14) {
+        return 'cloudy';
+    }
+    
+    if (wxIcon >= 15 && wxIcon <= 18) {
+        return 'rainy';
+    }
+    
+    if (wxIcon >= 19 && wxIcon <= 20) {
+        return 'stormy';
+    }
+    
+    if (wxIcon >= 22 && wxIcon <= 23) {
+        return 'snowy';
+    }
+    
+    if (wxIcon >= 24 && wxIcon <= 25) {
+        return 'foggy';
+    }
+    
+    // Check cloud cover code
+    if (clds === 'CLR' || clds === 'SKC') {
+        return 'sunny';
+    }
+    
+    if (clds === 'FEW' || clds === 'SCT') {
+        return 'partly-cloudy';
+    }
+    
+    if (clds === 'BKN' || clds === 'OVC') {
+        return 'cloudy';
+    }
+    
+    // Default fallback
+    return 'unknown';
 }
 
 /**
@@ -124,14 +214,14 @@ async function updateWeatherData(req, res) {
             // Convert GMT to GMT+4
             const dateTime = convertGMTtoGMT4(obs.valid_time_gmt);
             
-            // Determine sunny/cloudy
-            const sunny = isSunny(obs.wx_icon || obs.icon_extd);
+            // Determine weather status
+            const status = getWeatherStatus(obs);
 
             return {
                 date: dateTime,
                 temp: obs.temp,
                 rh: obs.rh, // Relative humidity
-                sunny: sunny
+                status: status // 'sunny', 'cloudy', 'partly-cloudy', 'rainy', 'snowy', 'foggy', 'stormy', or 'unknown'
             };
         });
 
